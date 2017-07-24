@@ -7,6 +7,9 @@
 #include "shaderuniform.h"
 #include "VTex.h"
 #include "light.h"
+#include "tessbumpspecular.h"
+#include "tessbump.h"
+#include "tessbumpborder.h"
 
 #define MaxBlockNumber 64 * 16 * 4
 #define MaxRegionScan  1.0 / 2.0
@@ -121,6 +124,7 @@ private:
 
 	void RenderPassGenerateVertices();
 
+	void InitMaxMin();
 
 	VTex htex; // height map
 	VTex btex; // blend map
@@ -139,10 +143,15 @@ private:
 
 	GLuint colortexture;
 
+	GLuint Maxmintexture;
+
 	GLuint hLevelTex, hLevelTex1;
 	unsigned char hLevel1[CHUNKNUMBER * CHUNKNUMBER];
 	float hLevel[CHUNKNUMBER * CHUNKNUMBER];
 
+	TessBumpShader_Specular m_specular;
+	TessBumpShader_Bump m_bump;
+	TessBumpShader_Border m_border;
 };
 
 #endif

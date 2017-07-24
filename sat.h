@@ -3,7 +3,6 @@
 
 class SAT {
 private:
-	double maxHeight[CHUNKNUMBER][CHUNKNUMBER];
 	double minHeight[CHUNKNUMBER][CHUNKNUMBER];
 	double* minSAT[CHUNKNUMBER][CHUNKNUMBER];
 	double* maxSAT[CHUNKNUMBER][CHUNKNUMBER];
@@ -22,5 +21,6 @@ public:
 	double getMaxDiff(int lx, int ly, int rx, int ry);
 	double getMaxOrMin(int lx, int ly, int rx, int ry, bool isMin);
 	void loadSATData(float currentX, float currentZ);
+	double maxHeight[CHUNKNUMBER][CHUNKNUMBER];
 };
 

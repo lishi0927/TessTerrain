@@ -119,7 +119,66 @@ void TessBumpTerrain::InitHeightLevel()
 
 bool TessBumpTerrain::InitShader()
 {
+	m_specular.Init();
+	m_specular.Enable();
+	m_specular.SetVtex(0);
+	m_specular.SetHeightmap(1);
+	m_specular.SetColortex(2);
+	m_specular.SetHLevel(3);
+	m_specular.SetHLevel1(4);
+	m_specular.SetSatTex(5);
+	m_specular.SetMaxMinTex(6);
+	glUseProgram(0);
 
+	m_bump.Init();
+	m_bump.Enable();
+	m_bump.SetVtex(0);
+	m_bump.SetHeightmap(1);
+	m_bump.SetColortex(2);
+	m_bump.SetHLevel(3);
+	m_bump.SetHLevel1(4);
+	glUseProgram(0);
+
+	m_border.Init();
+	m_border.Enable();
+	m_border.SetVtex(0);
+	m_border.SetHeightmap(1);
+	m_border.SetColortex(2);
+	m_border.SetHLevel(3);
+	m_border.SetHLevel1(4);
+	glUseProgram(0);
+}
+
+void TessBumpTerrain::InitMaxMin()
+{
+	SAT m_sat;
+	m_sat.loadMaxAndMin();
+
+	float* data = new float[CHUNKNUMBER * CHUNKNUMBER * 4];
+
+	for (int i = 0; i< CHUNKNUMBER; i++)
+		for (int j = 0; j < CHUNKNUMBER; j++)
+		{
+			data[4 * (i * CHUNKNUMBER + j) + 0] = m_sat.maxHeight[i][j];
+		}
+
+	// Create one OpenGL texture
+	glGenTextures(1, &Maxmintexture);
+
+	// "Bind" the newly created texture : all future texture functions will modify this texture
+	glBindTexture(GL_TEXTURE_2D, Maxmintexture);
+
+	// Give the image to OpenGL
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, CHUNKNUMBER, CHUNKNUMBER, 0, GL_RED, GL_FLOAT, data);
+
+	// OpenGL has now copied the data. Free our own version
+	delete[] data;
+
+	// ... nice trilinear filtering.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 }
 
 bool TessBumpTerrain::Init()
@@ -128,6 +187,8 @@ bool TessBumpTerrain::Init()
 
 	InitShader();
 
+	InitMaxMin();
+
 	//初始化，合成texture
 	if (!InitTexture()) return false;
 
@@ -135,6 +196,13 @@ bool TessBumpTerrain::Init()
 	glGetIntegerv(GL_MAX_PATCH_VERTICES, &MaxPatchVertices);
 	printf("Max supported patch vertices %d\n", MaxPatchVertices);
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+	htex.init(CHUNKSIZE, CHUNKNUMBER, true, LEVELOFTERRAIN);
+
+	m_directionalLight.AmbientIntensity = 0.9f;
+	m_directionalLight.DiffuseIntensity = 0.5f;
+	m_directionalLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+	m_directionalLight.Direction = glm::vec3(-1.0f, -1.0f, 0.0f);
 }
 
 void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock &tblock)
@@ -255,7 +323,6 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 	glBindTexture(GL_TEXTURE_2D, hLevelTex1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, CHUNKNUMBER, CHUNKNUMBER, 0, GL_RED, GL_UNSIGNED_BYTE, hLevel1);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
 }
 
 void TessBumpTerrain::updateBlock()
@@ -626,5 +693,117 @@ void TessBumpTerrain::RenderPassGenerateVertices()
 
 void TessBumpTerrain::Render()
 {
+	ViewFrustum();
 
+	glClearDepth(1.0f);
+	glClearColor(0.46f, 0.46f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+
+	if (transferdata)
+		RenderPassGenerateVertices();
+
+	if (m_linemode)
+	{
+		m_Textureflag = 3;
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		lineon = true;
+	}
+	else
+	{
+		if (lineon)
+		{
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			m_Textureflag = 1;
+			lineon = false;
+		}
+	}
+
+	glViewport(0, 0, WIDTH, HEIGHT);
+
+	m_specular.Enable();
+
+	m_specular.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
+	m_specular.SetWVP(m_WVP);
+	m_specular.SetWorldMatrix(m_World);
+	m_specular.SetDirectionalLight(m_directionalLight);
+	m_specular.SetEyeWorldPos(m_camerapos);
+	m_specular.SetMatSpecularIntensity(1.0f);
+	m_specular.SetMatSpecularPower(1.0f);
+	m_specular.SetShowAO(AOflag);
+	m_specular.SetShowTexture(m_Textureflag);
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, htex.getTex());
+
+	vector<PTex*> ptexes;
+	if (!transferdata)ptexes = htex.getPtexes();
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
+
+	glActiveTexture(GL_TEXTURE5);
+	glBindTexture(GL_TEXTURE_2D, Maxmintexture);
+
+	glBindVertexArray(vao[1]);
+
+	glDrawArrays(GL_PATCHES, 0, m_vertices.size());
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+
+	m_bump.Enable();
+	m_bump.SetWVP(m_WVP);
+
+	m_bump.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
+
+	m_bump.SetWorldMatrix(m_World);
+	m_bump.SetDirectionalLight(m_directionalLight);
+	m_bump.SetEyeWorldPos(m_camerapos);
+	m_bump.SetMatSpecularIntensity(1.0f);
+	m_bump.SetMatSpecularPower(1.0f);
+	m_bump.SetShowAO(AOflag);
+	m_bump.SetShowTexture(m_Textureflag);
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, htex.getTex());
+
+	if (!transferdata)ptexes = htex.getPtexes();
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
+
+	glBindVertexArray(vao[2]);
+
+	glDrawArrays(GL_TRIANGLES, 0, m_bumpvertices.size());
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+
+	m_border.Enable();
+	m_border.SetWVP(m_WVP);
+
+	m_border.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
+
+	m_border.SetWorldMatrix(m_World);
+	m_border.SetDirectionalLight(m_directionalLight);
+	m_border.SetEyeWorldPos(m_camerapos);
+	m_border.SetMatSpecularIntensity(1.0f);
+	m_border.SetMatSpecularPower(1.0f);
+	m_border.SetShowAO(AOflag);
+	m_border.SetShowTexture(m_Textureflag);
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, htex.getTex());
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
+
+	glBindVertexArray(vao[3]);
+
+	glDrawArrays(GL_PATCHES, 0, m_bordervertices.size());
+
+	glBindVertexArray(0);
+	glUseProgram(0);
 }
