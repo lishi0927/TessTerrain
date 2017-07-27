@@ -1,6 +1,4 @@
-#ifndef BASELIST_H
-#define BASELIST_H
-
+#pragma once
 #include "util.h"
 #include "basepage.h"
 
@@ -8,9 +6,9 @@
 class BaseList {
 protected:
 	BasePage *head, *tail;
+	BasePage *first;
     vector<vector<BasePage *> >pagePos;
 	int maxSize;
-	int count;
 	int virtualWidth;
 	int level;
 
@@ -25,4 +23,3 @@ public:
 	void clearCount();
 };
 
-#endif

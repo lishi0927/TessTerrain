@@ -33,10 +33,10 @@ void TessBumpTerrain::InitVertices() {
 		r *= 0.5;
 	}
 
-	glGenVertexArrays(3, vao);
-	glGenBuffers(3, vbo);
+	glGenVertexArrays(4, vao);
+	glGenBuffers(4, vbo);
 
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		glBindVertexArray(vao[i]);
 
@@ -126,8 +126,6 @@ bool TessBumpTerrain::InitShader()
 	m_specular.SetColortex(2);
 	m_specular.SetHLevel(3);
 	m_specular.SetHLevel1(4);
-	m_specular.SetSatTex(5);
-	m_specular.SetMaxMinTex(6);
 	glUseProgram(0);
 
 	m_bump.Init();
@@ -149,55 +147,23 @@ bool TessBumpTerrain::InitShader()
 	glUseProgram(0);
 }
 
-void TessBumpTerrain::InitMaxMin()
-{
-	SAT m_sat;
-	m_sat.loadMaxAndMin();
-
-	float* data = new float[CHUNKNUMBER * CHUNKNUMBER * 4];
-
-	for (int i = 0; i< CHUNKNUMBER; i++)
-		for (int j = 0; j < CHUNKNUMBER; j++)
-		{
-			data[4 * (i * CHUNKNUMBER + j) + 0] = m_sat.maxHeight[i][j];
-		}
-
-	// Create one OpenGL texture
-	glGenTextures(1, &Maxmintexture);
-
-	// "Bind" the newly created texture : all future texture functions will modify this texture
-	glBindTexture(GL_TEXTURE_2D, Maxmintexture);
-
-	// Give the image to OpenGL
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, CHUNKNUMBER, CHUNKNUMBER, 0, GL_RED, GL_FLOAT, data);
-
-	// OpenGL has now copied the data. Free our own version
-	delete[] data;
-
-	// ... nice trilinear filtering.
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-}
-
 bool TessBumpTerrain::Init()
 {
 	InitVertices();
 
 	InitShader();
 
-	InitMaxMin();
-
 	//初始化，合成texture
-	if (!InitTexture()) return false;
+//	if (!InitTexture()) return false;
 
 	GLint MaxPatchVertices = 0;
 	glGetIntegerv(GL_MAX_PATCH_VERTICES, &MaxPatchVertices);
 	printf("Max supported patch vertices %d\n", MaxPatchVertices);
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
 
-	htex.init(CHUNKSIZE, CHUNKNUMBER, true, LEVELOFTERRAIN);
+	htex.init(CHUNKSIZE, CHUNKNUMBER, "dem", LEVELOFTERRAIN);
+	btex.init(BLENDSIZE, CHUNKNUMBER, "texture", LEVELOFBLENDTEX);
+	ntex.init(CHUNKSIZE, CHUNKNUMBER, "normal", LEVELOFTERRAIN);
 
 	m_directionalLight.AmbientIntensity = 0.9f;
 	m_directionalLight.DiffuseIntensity = 0.5f;
@@ -224,10 +190,10 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 			yb = (pos.y > pos.w) ? yb + 1 : yb;
 			zs = (pos.z < -pos.w) ? zs + 1 : zs;
 			zb = (pos.z > pos.w) ? zb + 1 : zb;
-			minx = clampf(Min(pos.x / pos.w, minx), -1, 1);
-			miny = clampf(Min(pos.y / pos.w, miny), -1, 1);
-			maxx = clampf(Max(pos.x / pos.w, maxx), -1, 1);
-			maxy = clampf(Max(pos.y / pos.w, maxy), -1, 1);
+//			minx = clampf(Min(pos.x / pos.w, minx), -1, 1);
+//			miny = clampf(Min(pos.y / pos.w, miny), -1, 1);
+//			maxx = clampf(Max(pos.x / pos.w, maxx), -1, 1);
+//			maxy = clampf(Max(pos.y / pos.w, maxy), -1, 1);
 		}
 	if (xs == 8 || xb == 8 || ys == 8 || yb == 8 || zs == 8 || zb == 8)
 	{
@@ -240,9 +206,12 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 		return;
 	}
 
-	tblock.regionarea = (maxx - minx) * (maxy - miny);
+//	tblock.regionarea = (maxx - minx) * (maxy - miny);
 
-	if ((maxx - minx) > MaxRegionScan || (maxy - miny) > MaxRegionScan)
+	float sidelength = tblock.vertices[3].x - tblock.vertices[0].x;
+	float heightresolution = sidelength * (VIEWCHUNKNUMBER * CHUNKSIZE / 4.0 / MAXSCALE);
+
+	if (heightresolution > 64)
 	{
 		tblock.isparent = true;
 		//tblock.child = m_Block.size() + m_Child.size() + 1;
@@ -311,8 +280,63 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 
 void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 {
+	m_Child.clear();
+
+	memset(needUpdate, 0, sizeof(needUpdate));
+
+	for (int i = 0; i < m_Block.size(); i++)
+	{
+		m_Block[i].isparent = false;
+		updateBlock(currentX, currentZ, m_Block[i]);
+		if (m_Block[i].visible && !m_Block[i].isparent)
+		{
+			int lx, rx, ly, ry;
+			lx = m_Block[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			rx = m_Block[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			ly = m_Block[i].vertices[0].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			ry = m_Block[i].vertices[2].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+
+			int maxCoor = CHUNKNUMBER;
+			clamp(lx, 0, maxCoor);
+			clamp(ly, 0, maxCoor);
+			clamp(rx, 0, maxCoor);
+			clamp(ry, 0, maxCoor);
+
+			for (int k1 = lx; k1 <= rx; k1++)
+				for (int k2 = ly; k2 <= ry; k2++) {
+					needUpdate[k1][k2] |= 1;
+				}
+		}
+	}
+
+	for (int i = 0; i < m_Child.size(); i++)
+	{
+		m_Child[i].isparent = false;
+		updateBlock(currentX, currentZ, m_Child[i]);
+		if (m_Child[i].visible && !m_Child[i].isparent)
+		{
+			int lx, rx, ly, ry;
+			lx = m_Child[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			rx = m_Child[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			ly = m_Child[i].vertices[0].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			ry = m_Child[i].vertices[2].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+
+			int maxCoor = CHUNKNUMBER;
+			clamp(lx, 0, maxCoor);
+			clamp(ly, 0, maxCoor);
+			clamp(rx, 0, maxCoor);
+			clamp(ry, 0, maxCoor);
+
+			for (int k1 = lx; k1 <= rx; k1++)
+				for (int k2 = ly; k2 <= ry; k2++) {
+					needUpdate[k1][k2] |= 1;
+				}
+		}
+	}
+	int geolevel[1<<LEVEL-1][1 << LEVEL - 1];
+
 	htex.clear();
-	htex.update(currentX, currentZ, currentY, hLevel, hLevel1, m_WVP);
+	htex.update(currentX, currentZ, currentY, hLevel, hLevel1, m_WVP,geolevel,false,needUpdate);
 	htex.checkThreadState();
 	htex.generateTex();
 
@@ -323,6 +347,83 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 	glBindTexture(GL_TEXTURE_2D, hLevelTex1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, CHUNKNUMBER, CHUNKNUMBER, 0, GL_RED, GL_UNSIGNED_BYTE, hLevel1);
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void TessBumpTerrain::updateBtex()
+{
+	static float data[FEEDBACK_WIDTH * FEEDBACK_HEIGHT * 4];
+	static set<pair<int, int> > bSet;
+	bSet.clear();
+	feedback.begin();
+	glReadPixels(0, 0, FEEDBACK_WIDTH, FEEDBACK_HEIGHT, GL_RGBA, GL_FLOAT, (void*)&data);
+	feedback.end();
+	btex.clear();
+	ntex.clear();
+	ntex.checkThreadState();
+	btex.checkThreadState();
+
+	float horizondata[FEEDBACK_WIDTH];
+#pragma omp parallel for schedule(dynamic, 1)
+	{
+		for (int i = 0; i < FEEDBACK_WIDTH; i++)
+			horizondata[i] = 0.0;
+	}
+	int tot = 0;
+#pragma omp parallel for schedule(dynamic, 1)
+	{
+		for (int i = 0; i < FEEDBACK_HEIGHT; i++)
+			for (int j = 0; j < FEEDBACK_WIDTH; j++) {
+				float *p = data + (i * FEEDBACK_WIDTH + j) * 4;
+				if (fabs(p[3]) < 1e-6)
+					continue;
+
+				horizondata[j] = p[3];
+
+				p[2] += log2((float)FEEDBACK_WIDTH / (float)WIDTH);
+				int l = (int)round(p[2] - 0.5);
+				int r = (int)round(p[2] + 0.5);
+				int x, y;
+				x = floor(p[0] / (1.0 / CHUNKNUMBER) - 1e-6);
+				y = floor(p[1] / (1.0 / CHUNKNUMBER) - 1e-6);
+				clamp(x, 0, CHUNKNUMBER - 1);
+				clamp(y, 0, CHUNKNUMBER - 1);
+				clamp(l, 0, btex.getMaxLevel() - 1);
+				clamp(r, 0, btex.getMaxLevel() - 1);
+				int tx, ty;
+				tx = x >> l;
+				ty = y >> l;
+				if (bSet.find(make_pair(l, ty * (CHUNKNUMBER >> l) + tx)) == bSet.end()) {
+					ntex.update(l, tx, ty, false);
+					btex.update(l, tx, ty, false);
+					bSet.insert(make_pair(l, ty * (CHUNKNUMBER >> l) + tx));
+					tot++;
+				}
+				if (l != r) {
+					tx = x >> r;
+					ty = y >> r;
+					if (bSet.find(make_pair(l, ty * (CHUNKNUMBER >> r) + tx)) == bSet.end()) {
+						tot++;
+						ntex.update(l, tx, ty, false);
+						btex.update(l, tx, ty, false);
+						bSet.insert(make_pair(l, ty * (CHUNKNUMBER >> r) + tx));
+					}
+				}
+			}
+	}
+	btex.generateTex();
+	ntex.generateTex();
+
+#pragma omp parallel for schedule(dynamic, 1)
+	{
+		for (int i = 0; i < FEEDBACK_WIDTH; i++)
+		{
+			int id = horizondata[i] * (m_Block.size() + m_Child.size());
+			if (id <= m_Block.size())
+				m_Block[id - 1].ishorizon = true;
+			else
+				m_Child[id - m_Block.size() - 1].ishorizon = true;
+		}
+	}
 }
 
 void TessBumpTerrain::updateBlock()
@@ -564,6 +665,46 @@ void TessBumpTerrain::ViewFrustum()
 		lastPos = currentPos;
 		lastDir = currentDir;
 	}
+}
+
+void TessBumpTerrain::VTPassGenerateVertices()
+{
+	m_vtvertices.clear();
+	for (int i = 0; i < m_Block.size(); i++)
+	{
+		if (m_Block[i].visible && !m_Block[i].isparent)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				glm::vec3 vertices = m_Block[i].vertices[j] + glm::vec3(0.0, m_Block[i].blockID, 0.0);
+				m_vtvertices.push_back(vertices);
+			}
+		}
+	}
+
+	for (int i = 0; i < m_Child.size(); i++)
+	{
+		if (m_Child[i].visible && !m_Child[i].isparent)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				glm::vec3 vertices = m_Child[i].vertices[j] + glm::vec3(0.0, m_Child[i].blockID, 0.0);
+				m_vtvertices.push_back(vertices);
+			}
+		}
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * MaxBlockNumber, 0, GL_DYNAMIC_DRAW);
+
+	glm::vec3 *vtmapped = reinterpret_cast<glm::vec3*>(glMapBufferRange(GL_ARRAY_BUFFER, 0, sizeof(glm::vec3) * m_vtvertices.size(), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+
+	std::copy(m_vtvertices.begin(), m_vtvertices.end(), vtmapped);
+
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void TessBumpTerrain::RenderPassGenerateVertices()

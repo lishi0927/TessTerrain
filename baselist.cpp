@@ -10,7 +10,6 @@ BaseList::~BaseList() {
 }
 
 void BaseList::moveFront(BasePage * p) {
-	count++;
 	if (p == head)
 		return;
 	if (p->prev)
@@ -39,14 +38,18 @@ void BaseList::insert(int level, int x, int y, BasePage* p) {
 }
 
 BasePage* BaseList::getReplacePage() {
-	if (count > maxSize) {
+	if (tail == first) {
 		printf("physical pages are not enough.");
-		exit(0);
+		//exit(0);
 	}
 	BasePage* p = tail;
-	while (p->getLevel() == this->level - 1) {
+	while (p->getLevel() == this->level - 1) {	
 		moveFront(p);
-		p = tail;
+		p = tail;	
+		if (tail == first) {
+			printf("physical pages are not enough.");
+			//exit(0);
+		}
 	}
 	tail = tail->prev;
 	tail->next = nullptr;
@@ -68,5 +71,5 @@ BasePage* BaseList::findPage(int level, int x, int y) {
 }
 
 void BaseList::clearCount() {
-	count = 0;
+	first = head;
 }

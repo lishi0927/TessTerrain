@@ -1,6 +1,4 @@
-#ifndef BASEPAGE_H
-#define BASEPAGE_H
-
+#pragma once
 class BasePage {
 protected:
 	int level, vx, vy;
@@ -27,4 +25,3 @@ public:
 	virtual void loadData(int level, int x, int y) {};
 };
 
-#endif

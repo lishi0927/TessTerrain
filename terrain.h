@@ -10,6 +10,8 @@
 #include "tessbumpspecular.h"
 #include "tessbump.h"
 #include "tessbumpborder.h"
+#include "framebuffer.h"
+#include "tessbumpvt.h"
 
 #define MaxBlockNumber 64 * 16 * 4
 #define MaxRegionScan  1.0 / 2.0
@@ -113,6 +115,7 @@ private:
 	bool InitShader();
 	void InitHeightLevel();
 	void updateHtex(float currentX, float currentY, float currentZ);
+	void updateBtex();
 	void InitVertices();
 	void ViewFrustum();
 	void ChildBorderCrack(TessBumpBlock &tblock);
@@ -122,33 +125,37 @@ private:
 
 	void updateBlock();
 
+	void VTPassGenerateVertices();
 	void RenderPassGenerateVertices();
 
-	void InitMaxMin();
-
-	VTex htex; // height map
-	VTex btex; // blend map
+	VTex htex, btex, ntex;
 
 	bool transferdata;
 
 	std::vector<TessBumpBlock> m_Block;
 	std::vector<TessBumpBlock> m_Child;
 
+	std::vector<glm::vec3> m_vtvertices;
 	std::vector<glm::vec3> m_vertices;
 	std::vector<glm::vec3> m_bumpvertices;
 	std::vector<glm::vec3> m_bordervertices;
 
-	GLuint vao[3];
-	GLuint vbo[3];
+	GLuint vao[4];
+	GLuint vbo[4];
+
+	FrameBuffer feedback;
 
 	GLuint colortexture;
 
 	GLuint Maxmintexture;
 
+	bool needUpdate[CHUNKNUMBER][CHUNKNUMBER];
+
 	GLuint hLevelTex, hLevelTex1;
 	unsigned char hLevel1[CHUNKNUMBER * CHUNKNUMBER];
 	float hLevel[CHUNKNUMBER * CHUNKNUMBER];
 
+	TessBumpShadervt m_vtshader;
 	TessBumpShader_Specular m_specular;
 	TessBumpShader_Bump m_bump;
 	TessBumpShader_Border m_border;

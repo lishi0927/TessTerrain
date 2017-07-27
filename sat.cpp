@@ -1,4 +1,5 @@
 #include "sat.h"
+#include "util.h"
 
 double SAT::restore(double x, int ep, int htop, int hoff, int tot, bool isMin) {
 	double ret;
@@ -195,8 +196,6 @@ void SAT::loadSATData(int x, int y) {
 	string filename = "data/" + getChunkName(x, y) + "/maxDiffSAT";
 	FILE *f;
 	openfile(filename.c_str(), f);
-    if (f == nullptr)
-        printf("Cannot open SAT file.\n");
 	if (htop == -1) {
 		seekfile(f, 2 * sizeof(int), SEEK_SET);
 	 	fread(&htop, sizeof(int), 1, f);

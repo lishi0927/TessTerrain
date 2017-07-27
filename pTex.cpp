@@ -1,15 +1,19 @@
 #include "pTex.h"
+#include "util.h"
 
-PTex::PTex(int pageSize, int physicalWidth) {
+PTex::PTex(int pageSize, int physicalWidth, string dataname) {
 	this->payloadSize = pageSize;
 	this->physicalWidth = physicalWidth;
+
+	maxSize = physicalWidth * physicalWidth;
+	this->dataname = dataname;
 }
 
-void PTex::init(bool isHeightmap, int level, int virtualWidth) {
-	if (!isHeightmap)
+void PTex::init(int level, int virtualWidth) {
+	if (dataname[0] != 'd')
 		this->borderSize = BORDERSIZE;
-	else
-		this->borderSize = HBORDERSIZE;
+ 	else
+ 		this->borderSize = HBORDERSIZE;
 	this->pageSize = payloadSize + 2 * this->borderSize;
 	this->pixelSize = this->pageSize * this->physicalWidth;
 
@@ -20,20 +24,23 @@ void PTex::init(bool isHeightmap, int level, int virtualWidth) {
 	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	if (isHeightmap) {
+	if (dataname[0] == 'd') {
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, pixelSize, pixelSize,
 			0, GL_RED, GL_UNSIGNED_SHORT, nullptr);
 	}
+	else if (dataname[0] == 'm') {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixelSize, pixelSize,
+			0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	}
 	else {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,
-			pixelSize, pixelSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pixelSize, pixelSize, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	Page *last = nullptr;
-	for (int i = 0; i < physicalWidth; i++)
+	BasePage *last = nullptr;
+	for (int i = 0; i < physicalWidth; i++) 
 		for (int j = 0; j < physicalWidth; j++) {
-			Page* t = new Page(isHeightmap);
+			BasePage* t = new Page(dataname);
 			t->setPhysicalPos(j, i);
 			if (!i && !j)
 				head = t;
@@ -48,7 +55,7 @@ void PTex::init(bool isHeightmap, int level, int virtualWidth) {
 	this->level = level;
 	this->virtualWidth = virtualWidth;
 	for (int i = 0; i < level; i++) {
-		vector<Page*> tmp;
+		vector<BasePage*> tmp;
 		tmp.clear();
 		for (int j = 0; j < virtualWidth; j++)
 			for (int k = 0; k < virtualWidth; k++) {
@@ -58,65 +65,10 @@ void PTex::init(bool isHeightmap, int level, int virtualWidth) {
 		virtualWidth >>= 1;
 		virtualWidth = (virtualWidth == 0) ? 1 : virtualWidth;
 	}
-
-	this->isHeightmap = isHeightmap;
-}
-
-void PTex::moveFront(Page* p) {
-	if (p->prev)
-		p->prev->next = p->next;
-	if (p->next)
-		p->next->prev = p->prev;
-
-	if (p == tail)
-		tail = tail->prev;
-
-	if (p != head) {
-		head->prev = p;
-		p->next = head;
-		head = p;
-		head->prev = nullptr;
-	}
-}
-
-void PTex::insert(int level, int x, int y, Page* p) {
-	pagePos[level][y * (virtualWidth >> level) + x] = p;
-
-	head->prev = p;
-	p->next = head;
-	head = p;
-	head->prev = nullptr;
-}
-
-Page* PTex::getReplacePage() {
-	count++;
-	if (count > physicalWidth * physicalWidth) {
-		printf("physical pages are not enough.");
-		exit(0);
-	}
-	Page* p = tail;
-	while (p->getLevel() == this->level - 1) {
-		tail = tail->prev;
-		moveFront(p);
-		p = tail;
-	}
-	tail = tail->prev;
-	tail->next = nullptr;
-	int level = p->getLevel();
-	if (level == -1)
-		return p;
-	int x = p->getVx();
-	int y = p->getVy();
-	pagePos[level][y * (virtualWidth >> level) + x] = nullptr;
-	return p;
-}
-
-Page* PTex::findPage(int level, int x, int y) {
-	return pagePos[level][y * (virtualWidth >> level) + x];
 }
 
 const int dx[9] = { -1, 1,  0, 0, 0, -1, -1,  1, 1 };
-const int dy[9] = { 0, 0, -1, 1, 0, -1,  1, -1, 1 };
+const int dy[9] = {  0, 0, -1, 1, 0, -1,  1, -1, 1 };
 
 void PTex::calc_para(int i, int &xoff, int &yoff, int px, int py) {
 	switch (i) {
@@ -159,19 +111,44 @@ void PTex::calc_para(int i, int &xoff, int &yoff, int px, int py) {
 	}
 }
 
-void PTex::update(int level, int x, int y, Page* tp) {
-	
+void PTex::update(int level, int x, int y, BasePage* tp) {
+	//string filename;
+	//static TerrainData terrainData;
+	//static DDSLoader ddsloader;
+
 	int px = tp->getPx();
 	int py = tp->getPy();
 
-	if (isHeightmap) {
-
-		glBindTexture(GL_TEXTURE_2D, tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	if (dataname[0] == 'd') {
 		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
 			tp->getWidth(), tp->getHeight(),
-			GL_RED, GL_UNSIGNED_SHORT, tp->getHeightmap());
-		glBindTexture(GL_TEXTURE_2D, 0);
+			GL_RED, GL_UNSIGNED_SHORT, (ushort*)tp->getData());
 	}
+	else if (dataname[0] == 'm') {
+		int twidth = tp->getWidth();
+		int theight = tp->getHeight();
+		unsigned char* newdata = new unsigned char[twidth * theight * 4];
+		for(int i = 0; i < theight; i++)
+			for (int j = 0; j < twidth; j++)
+			{
+				double result = ((double*)tp->getData())[i * twidth + j];
+				for (int k = 0; k < 4; k++)
+				{
+					int ret1 = (int)(result * 256);
+					result = result * 256 - ret1;
+					newdata[4 * (i * twidth + j) + k] = ret1;
+				}
+			}
+		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
+			twidth, theight, GL_RGBA, GL_UNSIGNED_BYTE, newdata);
+		delete []newdata;
+	}
+	else {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
+			tp->getWidth(), tp->getHeight(), GL_RGB, GL_UNSIGNED_BYTE, (uchar*)tp->getData());
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 int PTex::getPixelSize() const {
@@ -192,8 +169,4 @@ int PTex::getBorderSize() const {
 
 GLuint PTex::getTex() {
 	return tex;
-}
-
-void PTex::clearCount() {
-	count = 0;
 }

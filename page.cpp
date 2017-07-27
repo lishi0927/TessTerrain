@@ -1,138 +1,118 @@
 #include "page.h"
 
-Page::Page(bool isHeightmap) {
+
+Page::Page(string dataname) {
 	level = -1;
 	prev = next = nullptr;
-	this->isHeightmap = isHeightmap;
-	heightmap = nullptr;
-	pixels = nullptr;
-	if (isHeightmap) {
+	data = nullptr;
+	this->dataname = dataname;
+	if (dataname[0] == 'd') {
 		width = height = CHUNKSIZE + 2 * HBORDERSIZE;
-		heightmap = new ushort[width * height];
+		data = new ushort[width * height];
+		cellByte = sizeof(ushort);
+		borderSize = HBORDERSIZE;
+		payloadSize = CHUNKSIZE;
+	}
+	else if (dataname[0] == 'm')
+	{
+		width = height = CHUNKSIZE + 2 * HBORDERSIZE;
+		data = new double[width * height];
+		cellByte = sizeof(double);
+		borderSize = HBORDERSIZE;
+		payloadSize = CHUNKSIZE;
 	}
 	else {
 		width = height = BLENDSIZE + 2 * BORDERSIZE;
-		pixels = new uchar[width * height];
+		data = new uchar[width * height * 3];
+		cellByte = sizeof(uchar) * 3;
+		borderSize = BORDERSIZE;
+		payloadSize = BLENDSIZE;
 	}
 }
 
 Page::~Page() {
-	free();
+	if (data)
+		delete data;
 }
 
-void Page::free() {
-	if (heightmap)
-		delete heightmap;
-	if (pixels)
-		delete pixels;
-}
-
-int Page::getLevel() const {
-	return level;
-}
-
-int Page::getVx() const {
-	return vx;
-}
-
-int Page::getVy() const {
-	return vy;
-}
-
-int Page::getPx() const {
-	return px;
-}
-
-int Page::getPy() const {
-	return py;
-}
-
-void Page::setVirtualPos(int level, int x, int y) {
-	this->level = level;
-	this->vx = x;
-	this->vy = y;
-}
-
-void Page::setPhysicalPos(int x, int y) {
-	this->px = x;
-	this->py = y;
-}
-
-int Page::getWidth() const {
-	return width;
-}
-
-int Page::getHeight() const {
-	return height;
-}
-
-ushort* Page::getHeightmap() {
-	return heightmap;
-}
-
-uchar* Page::getPixels() {
-	return pixels;
+void Page::loadData(int level, int x, int y) {
+	if (dataname[0] == 'd') {
+		//memset(heightmap, 0, width * height * 2);
+		loadHeightPage(level, x, y);
+	}
+	else {
+		loadHeightPage(level, x, y);
+	}
 }
 
 void Page::loadBorderData(int level, int tx, int ty, int pos) {
-	int nSize = HBORDERSIZE;
+	int nSize = borderSize;
 	int rp;
-	rp = HBORDERSIZE + (CHUNKSIZE >> level) * (1 << level);
+	rp = borderSize + (payloadSize >> level) * (1 << level);
 
 	string filename;
 
-	int offset = 12;
+	int offset = (dataname[0] == 'd') ? 12 : 0;
 
-	unsigned short *hp = nullptr;
+	uchar *hp = nullptr;
 	if (pos > CENTER) {
 		switch (pos) {
 		case LEFTTOP:
-			filename = "data/" + getChunkName(tx << level, ty << level) + "/" + TERRAINFILE;
+			filename = "data/" + getChunkName(tx << level, ty << level) + "/" + dataname;
 			break;
 		case RIGHTTOP:
 			if ((tx << level) + (1 << level) - 1 >= CHUNKNUMBER)
 				return;
-			filename = "data/" + getChunkName((tx << level) + (1 << level) - 1, ty << level) + "/" + TERRAINFILE;
+			filename = "data/" + getChunkName((tx << level) + (1 << level) - 1, ty << level) + "/" + dataname;
 			break;
 		case LEFTBOTTOM:
 			if ((ty << level) + (1 << level) - 1 >= CHUNKNUMBER)
 				return;
-			filename = "data/" + getChunkName(tx << level, (ty << level) + (1 << level) - 1) + "/" + TERRAINFILE;
+			filename = "data/" + getChunkName(tx << level, (ty << level) + (1 << level) - 1) + "/" + dataname;
 			break;
 		case RIGHTBOTTOM:
 			if ((tx << level) + (1 << level) - 1 >= CHUNKNUMBER || (ty << level) + (1 << level) - 1 >= CHUNKNUMBER)
 				return;
-			filename = "data/" + getChunkName((tx << level) + (1 << level) - 1, (ty << level) + (1 << level) - 1) + "/" + TERRAINFILE;
+			filename = "data/" + getChunkName((tx << level) + (1 << level) - 1, (ty << level) + (1 << level) - 1) + "/" + dataname;
 			break;
 		}
 		filename += '0' + level;
 		FILE *f;
-		openfile(filename.c_str(), f);
+		openfile(filename.c_str(), f);	
 		int w, h;
-		fread(&w, 4, 1, f);
-		fread(&h, 4, 1, f);
+		if (dataname[0] == 'd') {
+			fread(&w, 4, 1, f);
+			fread(&h, 4, 1, f);
+		}
+		else {
+			w = h = BLENDSIZE >> level;
+		}
 
 		for (int i = 0; i < nSize; i++) {
 			switch (pos) {
 			case LEFTTOP:
-				seekfile(f, offset + i * w * sizeof(short), SEEK_SET);
-				hp = heightmap + (i + rp) * width + rp;
+				seekfile(f, offset + i * w * cellByte, SEEK_SET);
+				//hp = heightmap + (i + HBORDERSIZE + CHUNKSIZE + 1) * width
+				//	- HBORDERSIZE;
+				hp = (uchar*)data + ((i + rp) * width + rp) * cellByte;
 				break;
 			case RIGHTTOP:
-				seekfile(f, offset + ((i + 1) * w - nSize) * sizeof(short), SEEK_SET);
-				hp = heightmap + (i + rp) * width;
+				seekfile(f, offset + ((i + 1) * w - nSize) * cellByte, SEEK_SET);
+				//hp = heightmap + (i + HBORDERSIZE + CHUNKSIZE) * width;
+				hp = (uchar*)data + ((i + rp) * width) * cellByte;
 				break;
 			case LEFTBOTTOM:
-				seekfile(f, offset + (h - nSize + i) * w * sizeof(short), SEEK_SET);
-				hp = heightmap + i * width + rp;
+				seekfile(f, offset + (h - nSize + i) * w * cellByte, SEEK_SET);
+				//hp = heightmap + (i + 1) * width - HBORDERSIZE;
+				hp = (uchar*)data + (i * width + rp) * cellByte;
 				break;
 			case RIGHTBOTTOM:
-				seekfile(f, offset + ((h - nSize + i + 1) * w - nSize) * sizeof(short),
+				seekfile(f, offset + ((h - nSize + i + 1) * w - nSize) * cellByte,
 					SEEK_SET);
-				hp = heightmap + i * width;
+				hp = (uchar*)data + i * width * cellByte;
 				break;
 			}
-			fread(hp, nSize * sizeof(short), 1, f);
+			fread(hp, nSize * cellByte, 1, f);
 		}
 		fclose(f);
 	}
@@ -146,24 +126,31 @@ void Page::loadBorderData(int level, int tx, int ty, int pos) {
 			else
 				y = (ty << level) + (1 << level) - 1;
 			for (int x = sX; x < eX; x++) {
-				filename = "data/" + getChunkName(x, y) + "/" + TERRAINFILE;
+				filename = "data/" + getChunkName(x, y) + "/" + dataname;
 				filename += '0' + level;
 				FILE *f;
 				openfile(filename.c_str(), f);
 				int w, h;
-				fread(&w, 4, 1, f);
-				fread(&h, 4, 1, f);
+				if (dataname[0] == 'd') {
+					fread(&w, 4, 1, f);
+					fread(&h, 4, 1, f);
+				}
+				else {
+					w = h = BLENDSIZE >> level;
+				}
 				assert(h >= nSize);
 				for (int i = 0; i < nSize; i++) {
 					if (pos == TOP) {
-						hp = heightmap + (i + rp) * width + HBORDERSIZE + (x - sX) * w;
-						seekfile(f, offset + i * w * sizeof(short), SEEK_SET);
-						fread(hp, w * sizeof(short), 1, f);
-					}
+						//hp = heightmap + (i + HBORDERSIZE + CHUNKSIZE) * width +
+							//HBORDERSIZE + (x - sX) * w;
+						hp = (uchar*)data + ((i + rp) * width +	borderSize + (x - sX) * w) * cellByte;
+						seekfile(f, offset + i * w * cellByte, SEEK_SET);
+						fread(hp, w * cellByte, 1, f);
+					} 
 					else {
-						hp = heightmap + i * width + HBORDERSIZE + (x - sX) * w;
-						seekfile(f, offset + (h - nSize + i) * w * sizeof(short), SEEK_SET);
-						fread(hp, w * sizeof(short), 1, f);
+						hp = (uchar*) data + (i * width + borderSize + (x - sX) * w) * cellByte;
+						seekfile(f, offset + (h - nSize + i) * w * cellByte, SEEK_SET);
+						fread(hp, w * cellByte, 1, f);
 					}
 				}
 				fclose(f);
@@ -176,26 +163,30 @@ void Page::loadBorderData(int level, int tx, int ty, int pos) {
 			if (pos == LEFT)
 				x = tx << level;
 			else
-				x = (tx << level) + (1 << level) - 1;
+				x = (tx << level) + (1 << level) -1;
 			for (int y = sY; y < eY; y++) {
-				filename = "data/" + getChunkName(x, y) + "/" + TERRAINFILE;
+				filename = "data/" + getChunkName(x, y) + "/" + dataname;
 				filename += '0' + level;
 				FILE *f;
 				openfile(filename.c_str(), f);
 				int w, h;
-				fread(&w, 4, 1, f);
-				fread(&h, 4, 1, f);
-				assert(w >= nSize);
+				if (dataname[0] == 'd') {
+					fread(&w, 4, 1, f);
+					fread(&h, 4, 1, f);
+					assert(w >= nSize);
+				}
+				else
+					w = h = BLENDSIZE >> level;
 				for (int i = 0; i < h; i++) {
 					if (pos == LEFT) {
-						hp = heightmap + ((y - sY) * h + i + HBORDERSIZE) * width + rp;
-						seekfile(f, offset + i * w * sizeof(short), SEEK_SET);
-						fread(hp, nSize * sizeof(short), 1, f);
+						hp = (uchar*)data + (((y - sY) * h + i + borderSize) * width + rp) * cellByte;
+						seekfile(f, offset + i * w * cellByte, SEEK_SET);
+						fread(hp, nSize * cellByte, 1, f);
 					}
 					else {
-						hp = heightmap + ((y - sY) * h + i + HBORDERSIZE) * width;
-						seekfile(f, offset + ((i + 1) * w - nSize) * sizeof(short), SEEK_SET);
-						fread(hp, nSize * sizeof(short), 1, f);
+						hp = (uchar*)data + ((y - sY) * h + i + borderSize) * width * cellByte;
+						seekfile(f, offset + ((i + 1) * w - nSize) * cellByte, SEEK_SET);
+						fread(hp, nSize * cellByte, 1, f);
 					}
 				}
 				fclose(f);
@@ -213,43 +204,46 @@ void Page::loadHeightmap(int level, int tx, int ty, int pos) {
 	int sX, eX, sY, eY;
 	sX = tx << level;
 	eX = (tx << level) + (1 << level);
-	clamp(eX, 0, CHUNKNUMBER - 1);
+	clamp(eX, 0, CHUNKNUMBER);
 	sY = ty << level;
 	eY = (ty << level) + (1 << level);
-	clamp(eY, 0, CHUNKNUMBER - 1);
+	clamp(eY, 0, CHUNKNUMBER);
 
-	unsigned short *hp = nullptr;
-	for (int y = sY; y < eY; y++)
+	uchar *hp = nullptr;
+	for (int y = sY; y < eY; y++) 
 		for (int x = sX; x < eX; x++) {
-			string filename = "data/" + getChunkName(x, y) + "/" + TERRAINFILE;
+			string filename = "data/" + getChunkName(x, y) + "/" + dataname;
 			filename += '0' + level;
 			FILE *f;
 			openfile(filename.c_str(), f);
 
 			int w, h;
-			fread(&w, 4, 1, f);
-			fread(&h, 4, 1, f);
+			if (dataname[0] == 'd') {
+				fread(&w, 4, 1, f);
+				fread(&h, 4, 1, f);
+				float tmp;
+				fread(&tmp, sizeof(float), 1, f);
+			}
+			else
+				w = h = BLENDSIZE >> level;
 
-			float tmp;
-			fread(&tmp, sizeof(float), 1, f);
 
 			for (int i = 0; i < h; i++) {
-				hp = heightmap + ((y - sY) * h + HBORDERSIZE + i) * width +
-					((x - sX) * w + HBORDERSIZE);
-				fread(hp, w * sizeof(short), 1, f);
+				hp = (uchar*)data + (((y - sY) * h + borderSize + i) * width +
+					((x - sX) * w + borderSize)) * cellByte;
+				fread(hp, w * cellByte, 1, f);
 			}
 			fclose(f);
 		}
 }
 
 const int dx[9] = { -1, 1,  0, 0, 0, -1, -1,  1, 1 };
-const int dy[9] = { 0, 0, -1, 1, 0, -1,  1, -1, 1 };
+const int dy[9] = {  0, 0, -1, 1, 0, -1,  1, -1, 1 };
 
-void Page::loadHeightPage(int level, int x, int y) {
+void Page::loadHeightPage(int level, int x, int y) {	
 	int vw, vh;
 	vw = CHUNKNUMBER >> level;
-	if (vw == 0)
-		vw = 1;
+	vw = (vw == 0) ? 1 : vw;
 	vh = vw;
 
 	int tx, ty;
@@ -262,8 +256,6 @@ void Page::loadHeightPage(int level, int x, int y) {
 		loadHeightmap(level, tx, ty, i);
 	}
 }
-void Page::loadPage(int level, int x, int y) {
-	if (isHeightmap) {
-		loadHeightPage(level, x, y);
-	}
-}
+//void Page::loadPage(int level, int x, int y) {
+//
+//}

@@ -1,40 +1,22 @@
-#ifndef PAGE_H
-#define PAGE_H
-
+#pragma once
 #include "util.h"
+#include "basepage.h"
 
-class Page {
+class Page : public BasePage {
 private:
-	int level, vx, vy;
-	int px, py;
+	int cellByte;
+	string dataname;
+	int borderSize;
+	int payloadSize;
 
-	bool isHeightmap;
-
-	int width, height;
-	ushort *heightmap;
-	uchar *pixels;
+	float *realdata;
 
 	void loadBorderData(int level, int tx, int ty, int pos);
 	void loadHeightmap(int level, int tx, int ty, int pos);
 	void loadHeightPage(int level, int x, int y);
 
 public:
-	Page *prev, *next;
-
-	Page(bool isHeightmap);
+	Page(string dataname);
 	~Page();
-	void free();
-	int getLevel() const;
-	int getVx() const;
-	int getVy() const;
-	int getPx() const;
-	int getPy() const;
-	void setVirtualPos(int level, int x, int y);
-	void setPhysicalPos(int x, int y);
-	int getWidth() const;
-	int getHeight() const;
-	ushort * getHeightmap();
-	uchar * getPixels();
-	void loadPage(int level, int x, int y);
+	virtual void loadData(int level, int x, int y);
 };
-#endif

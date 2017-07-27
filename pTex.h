@@ -1,5 +1,4 @@
-#ifndef PTEX_H
-#define PTEX_H
+#pragma once
 
 #include "util.h"
 #include "page.h"
@@ -8,39 +7,38 @@
 #include "terrainData.h"
 #include "ddsloader.h"
 #include "sat.h"
+#include "baselist.h"
 using namespace std;
 
-class PTex {
+class PTex : public BaseList {
 private:
-	int pageSize, physicalWidth, pixelSize;
-	int level, virtualWidth;
-	int borderSize, payloadSize;
-	bool isHeightmap;
-	GLuint tex;
-	Page *head, *tail;
-	vector<vector<Page *> >pagePos;
-	int count;
+    int pageSize, pixelSize, physicalWidth;
+    //int level, virtualWidth;
+    int borderSize, payloadSize;
+	string dataname;
+    GLuint tex;
+	//BasePage *head, *tail;
+ //   vector<vector<BasePage *> >pagePos;
+    int count;
 
 public:
-	PTex(int pageSize, int physicalWidth);
-	void init(bool isHeightmap, int level, int virtualWidth);
-	void moveFront(Page * p);
-	void insert(int level, int x, int y, Page * p);
-	Page * getReplacePage();
-	Page * findPage(int level, int x, int y);
+    PTex(int pageSize, int physicalWidth, string dataname);
+	void init(int level, int virtualWidth);
+	//void moveFront(BasePage * p);
+	//void insert(int level, int x, int y, BasePage * p);
+	//BasePage * getReplacePage();
+	//BasePage * findPage(int level, int x, int y);
 	void calc_para(int i, int & xoff, int & yoff, int px, int py);
-	void update(int level, int x, int y, Page* tp);
+	void update(int level, int x, int y, BasePage* tp);
 	int getPixelSize() const;
 	int getPhysicalWidth() const;
 	int getPayloadSize() const;
 	int getBorderSize() const;
 	GLuint getTex();
-	void clearCount();
+	//void clearCount();
 };
 
 class PageInfo {
 	int level, x, y;
 };
 
-
-#endif
