@@ -11,6 +11,10 @@ bool TessBumpShadervt::Init()
 	m_heightmapLocation = glGetUniformLocation(shader, "texHeightmap");
 	m_gBlockSizeLocation = glGetUniformLocation(shader, "blocksize");
 
+
+	m_hlevelLocation = glGetUniformLocation(shader, "texHLevel");
+	m_hlevel1Location = glGetUniformLocation(shader, "texHLevel1");
+
 	if (m_gWVPLocation == 0xFFFFFFFF ||
 		m_currentPosLocation == 0xFFFFFFFF ||
 		m_vtexLocation == 0xFFFFFFFF ||
@@ -44,4 +48,14 @@ void TessBumpShadervt::SetVtex(unsigned int TextureUnit)
 void TessBumpShadervt::SetBlockSize(float size)
 {
 	glUniform1f(m_gBlockSizeLocation, size);
+}
+
+void TessBumpShadervt::SetHLevel(unsigned int TextureUnit)
+{
+	glUniform1i(m_hlevelLocation, TextureUnit);
+}
+
+void TessBumpShadervt::SetHLevel1(unsigned int TextureUnit)
+{
+	glUniform1i(m_hlevel1Location, TextureUnit);
 }

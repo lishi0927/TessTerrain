@@ -18,12 +18,18 @@ public:
 	void SetVtex(unsigned int TextureUnit);
 
 	void SetBlockSize(float size);
+
+	void SetHLevel(unsigned int TextureUnit);
+
+	void SetHLevel1(unsigned int TextureUnit);
 private:
 	GLuint m_vtexLocation;
 	GLuint m_heightmapLocation;
 	GLuint m_currentPosLocation;
 	GLuint m_gWVPLocation;
 	GLuint m_gBlockSizeLocation;
+	GLuint m_hlevelLocation;
+	GLuint m_hlevel1Location;
 };
 
 

@@ -1,5 +1,7 @@
 #include "pTex.h"
 #include "util.h"
+#include <iostream>
+#include <bitset>
 
 PTex::PTex(int pageSize, int physicalWidth, string dataname) {
 	this->payloadSize = pageSize;
@@ -10,7 +12,7 @@ PTex::PTex(int pageSize, int physicalWidth, string dataname) {
 }
 
 void PTex::init(int level, int virtualWidth) {
-	if (dataname[0] != 'd')
+	if (dataname[0] != 'd' && dataname[0] != 'm')
 		this->borderSize = BORDERSIZE;
  	else
  		this->borderSize = HBORDERSIZE;
@@ -29,8 +31,20 @@ void PTex::init(int level, int virtualWidth) {
 			0, GL_RED, GL_UNSIGNED_SHORT, nullptr);
 	}
 	else if (dataname[0] == 'm') {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixelSize, pixelSize,
-			0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, pixelSize, pixelSize,
+			0, GL_RGBA, GL_UNSIGNED_SHORT, nullptr);
+	}
+	else if (dataname[0] == 'A') {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, pixelSize, pixelSize,
+			0, GL_RED, GL_FLOAT, nullptr);
+	}
+	else if (dataname[0] == 'L' || dataname[0] == 'n') {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pixelSize, pixelSize, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	else if (dataname[0] == 'V')
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, pixelSize, pixelSize,
+			0, GL_RGBA, GL_UNSIGNED_SHORT, nullptr);
 	}
 	else {
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pixelSize, pixelSize, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
@@ -128,21 +142,37 @@ void PTex::update(int level, int x, int y, BasePage* tp) {
 	else if (dataname[0] == 'm') {
 		int twidth = tp->getWidth();
 		int theight = tp->getHeight();
-		unsigned char* newdata = new unsigned char[twidth * theight * 4];
+		unsigned short* newdata = new unsigned short[twidth * theight * 4];
 		for(int i = 0; i < theight; i++)
 			for (int j = 0; j < twidth; j++)
 			{
-				double result = ((double*)tp->getData())[i * twidth + j];
+				double result = ((double*)(tp->getData()))[i * twidth + j];
+				result = 100;
+				uint64_t representation = getRepresentation(result);
 				for (int k = 0; k < 4; k++)
 				{
-					int ret1 = (int)(result * 256);
-					result = result * 256 - ret1;
-					newdata[4 * (i * twidth + j) + k] = ret1;
+					ushort result1 = representation & 0xFFFF;
+					representation = representation >> 16;
+					newdata[(i* twidth + j) * 4 + k] = result1;
 				}
 			}
 		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
-			twidth, theight, GL_RGBA, GL_UNSIGNED_BYTE, newdata);
+			twidth, theight, GL_RGBA, GL_UNSIGNED_SHORT, newdata);
 		delete []newdata;
+	}
+	else if (dataname[0] == 'A') {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
+			tp->getWidth(), tp->getHeight(), GL_RED, GL_FLOAT, (float*)tp->getData());
+	}
+	else if (dataname[0] == 'L' || dataname[0] == 'n')
+	{
+	glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
+	    tp->getWidth(), tp->getHeight(), GL_RGB, GL_FLOAT, (float*)tp->getData());
+	}
+	else if (dataname[0] == 'V')
+	{
+	    glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,
+			tp->getWidth(), tp->getHeight(), GL_RGBA, GL_UNSIGNED_SHORT, (ushort*)tp->getData());
 	}
 	else {
 		glTexSubImage2D(GL_TEXTURE_2D, 0, px * pageSize, py * pageSize,

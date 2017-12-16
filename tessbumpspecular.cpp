@@ -18,17 +18,27 @@ bool TessBumpShader_Specular::Init()
 	m_currentPosLocation = glGetUniformLocation(shader, "currentPos");
 	m_vtexLocation = glGetUniformLocation(shader, "vtex");
 	m_heightmapLocation = glGetUniformLocation(shader, "texHeightmap");
-	m_texLocation = glGetUniformLocation(shader, "colormap");
+	m_texLocation = glGetUniformLocation(shader, "blendtex");
 
-	m_AOLocation = glGetUniformLocation(shader, "AOmap");
+	m_AOtexLocation = glGetUniformLocation(shader, "aotex");
+	m_AOleveltexLocation = glGetUniformLocation(shader, "texaolevel");
+	m_AOmaptexLocation = glGetUniformLocation(shader, "texAOmap");
+	m_AOmaxdiffLocation = glGetUniformLocation(shader, "texaomaxdiff");
+
 	m_satLocation = glGetUniformLocation(shader, "Satmap");
-	m_maxminLocation = glGetUniformLocation(shader, "maxmintexture");
+//	m_maxminLocation = glGetUniformLocation(shader, "maxmintexture");
 
 	m_ShowAOLocation = glGetUniformLocation(shader, "gShowAO");
 	m_ShowTextureLocation = glGetUniformLocation(shader, "gShowTexture");
 
-	m_hlevelLocation = glGetUniformLocation(shader, "HLevel");
-	m_hlevel1Location = glGetUniformLocation(shader, "HLevel1");
+	m_hlevelLocation = glGetUniformLocation(shader, "texHLevel");
+	m_hlevel1Location = glGetUniformLocation(shader, "texHLevel1");
+
+	m_btexLocation = glGetUniformLocation(shader, "btex");
+	m_ntexLocation = glGetUniformLocation(shader, "ntex");
+	m_normalmapLocation = glGetUniformLocation(shader, "normaltex");
+//	m_normallevelLocation = glGetUniformLocation(shader, "normallevel");
+
 
 	if (m_dirLightLocation.AmbientIntensity == 0xFFFFFFFF ||
 		m_WVPLocation == 0xFFFFFFFF ||
@@ -42,11 +52,12 @@ bool TessBumpShader_Specular::Init()
 		m_currentPosLocation == 0xFFFFFFFF ||
 		m_vtexLocation == 0xFFFFFFFF ||
 		m_heightmapLocation == 0xFFFFFFFF ||
-		m_AOLocation == 0xFFFFFFFF ||
+//		m_AOLocation == 0xFFFFFFFF ||
 		m_satLocation == 0xFFFFFFFF ||
-		m_maxminLocation == 0xFFFFFFFF ||
+//		m_maxminLocation == 0xFFFFFFFF ||
 		m_hlevelLocation == 0xFFFFFFFF ||
-		m_hlevel1Location == 0xFFFFFFFF) {
+		m_hlevel1Location == 0xFFFFFFFF ||
+		m_normallevelLocation == 0xFFFFFFFF) {
 		return false;
 	}
 
@@ -108,9 +119,24 @@ void TessBumpShader_Specular::SetColortex(unsigned int TextureUnit)
 	glUniform1i(m_texLocation, TextureUnit);
 }
 
-void TessBumpShader_Specular::SetAOTex(unsigned int TextureUnit)
+void TessBumpShader_Specular::SetAOtex(unsigned int TextureUnit)
 {
-	glUniform1i(m_AOLocation, TextureUnit);
+	glUniform1i(m_AOtexLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetAOlevelTex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOleveltexLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetAOmaxdiffTex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOmaxdiffLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetAOMaptex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOmaptexLocation, TextureUnit);
 }
 
 void TessBumpShader_Specular::SetSatTex(unsigned int TextureUnit)
@@ -143,4 +169,24 @@ void TessBumpShader_Specular::SetHLevel(unsigned int TextureUnit)
 void TessBumpShader_Specular::SetHLevel1(unsigned int TextureUnit)
 {
 	glUniform1i(m_hlevel1Location, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetNtex(unsigned int TextureUnit)
+{
+	glUniform1i(m_ntexLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetBtex(unsigned int TextureUnit)
+{
+	glUniform1i(m_btexLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetNormaltex(unsigned int TextureUnit)
+{
+	glUniform1i(m_normalmapLocation, TextureUnit);
+}
+
+void TessBumpShader_Specular::SetNormallevel(unsigned int TextureUnit)
+{
+	glUniform1i(m_normallevelLocation, TextureUnit);
 }

@@ -33,3 +33,9 @@ void seekfile(FILE* fp, int off, int pos) {
 		exit(1);
 	}
 }
+
+uint64_t getRepresentation(const double number) {
+	uint64_t representation = 0;
+	memcpy(&representation, &number, sizeof(representation));
+	return representation;
+}

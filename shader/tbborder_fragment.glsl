@@ -23,12 +23,15 @@ uniform sampler2D normaltex;
 uniform sampler2D btex;
 uniform sampler2D blendtex;
 
-uniform vec4 currentPos;
 
 uniform sampler2D vtex;
 uniform sampler2D texHeightmap;
 uniform sampler2D texHLevel;
 uniform sampler2D texHLevel1;
+
+uniform sampler2D aotex;
+uniform sampler2D texAOmap;
+uniform sampler2D texaolevel;
 
 uniform vec4 currentPos;
 
@@ -37,9 +40,10 @@ uniform int gShowTexture;
 out vec4 color;
 
 const float VIEWCHUNKNUMBER = 16.0;
-const float MAXSCALE = 200.0 * VIEWCHUNKNUMBER / 4.0;
 const float CHUNKNUMBER = 32.0;
 const float CHUNKSIZE = 512.0;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
+
 
 const float maxAniso = 4;
 const float maxAnisoLog2 = log2( maxAniso );
@@ -125,7 +129,7 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
    return finalTexCoords;
 }
 
-vec4 CalcLightInternal(BaseLight Light, vec3 LightDirection, vec3 Normal)                  
+vec4 CalcLightInternal(BaseLight Light, vec3 LightDirection, vec3 Normal, float AOvalue)                   
 {                                                                                           
     vec4 AmbientColor = vec4(Light.Color * Light.AmbientIntensity, 1.0f);
     float DiffuseFactor = dot(Normal, -LightDirection);                                     
@@ -144,12 +148,12 @@ vec4 CalcLightInternal(BaseLight Light, vec3 LightDirection, vec3 Normal)
             SpecularColor = vec4(Light.Color * gMatSpecularIntensity * SpecularFactor, 1.0f);
         }                                                                                   
     }                                                                                                                                                                           
-    return AmbientColor + DiffuseColor + SpecularColor;                                  
+    return AmbientColor * (1.0 - AOvalue / 2.0)+ DiffuseColor + SpecularColor;                                  
 } 
 
-vec4 CalcDirectionalLight(vec3 Normal)                                                     
+vec4 CalcDirectionalLight(vec3 Normal, float AOvalue)                                                      
 {                                                                                           
-    return CalcLightInternal(gDirectionalLight.Base, gDirectionalLight.Direction, Normal);  
+    return CalcLightInternal(gDirectionalLight.Base, gDirectionalLight.Direction, Normal, AOvalue);   
 }
 
 void main()
@@ -205,9 +209,15 @@ void main()
   
    vec3 Normal = normalize(Normal0);
 
+    float level = texture(texaolevel, uv).r;
+	level *= 255;
+	vec4 scaleBias = textureLod(aotex, uv, level);
+    vec2 pCoor = uv * scaleBias.x + scaleBias.zw;
+    float AOvalue = texture(texAOmap, pCoor).r;
+
 if(gShowTexture == 1)
   {
-   vec4 TotalLight = CalcDirectionalLight(Normal0, AO);
+   vec4 TotalLight = CalcDirectionalLight(Normal0, AOvalue);
    color = color * TotalLight;
   }
   else if(gShowTexture == 2)

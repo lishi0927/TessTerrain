@@ -15,9 +15,10 @@ in vec3 Position_CS_in[];
 out vec3 Position_ES_in[];
 
 const float VIEWCHUNKNUMBER = 16.0;
-const float MAXSCALE = 200.0 * VIEWCHUNKNUMBER / 4.0;
 const float CHUNKNUMBER = 32.0;
 const float CHUNKSIZE = 512.0;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
+
 
 void main()
 {

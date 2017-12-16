@@ -12,8 +12,12 @@ private:
 	float *realdata;
 
 	void loadBorderData(int level, int tx, int ty, int pos);
-	void loadHeightmap(int level, int tx, int ty, int pos);
-	void loadHeightPage(int level, int x, int y);
+	void loadmap(int level, int tx, int ty, int pos);
+	void loadPage(int level, int x, int y);
+
+	void loadVisPage(int level, int x, int y);
+	void loadVismap(int level, int tx, int ty, int pos);
+	void loadVisBorderData(int level, int tx, int ty, int pos);
 
 public:
 	Page(string dataname);

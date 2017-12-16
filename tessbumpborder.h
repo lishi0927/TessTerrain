@@ -26,9 +26,23 @@ public:
 
 	void SetMatSpecularPower(float Power);
 
+	void SetBtex(unsigned int TextureUint);
+
 	void SetColortex(unsigned int TextureUnit);
 
-	void SetAOTex(unsigned int TextureUnit);
+	void SetNtex(unsigned int TextureUnit);
+
+	void SetNormaltex(unsigned int TextureUnit);
+
+	void SetNormallevel(unsigned int TextureUnit);
+
+	void SetAOtex(unsigned int TextureUnit);
+
+	void SetAOlevelTex(unsigned int TextureUnit);
+
+	void SetAOmaxTex(unsigned int TextureUnit);
+
+	void SetAOMaptex(unsigned int TextureUnit);
 
 	void SetShowAO(int flag);
 
@@ -50,12 +64,21 @@ private:
 
 	GLuint m_texLocation;
 
-	GLuint m_AOLocation;
+	GLuint m_AOtexLocation;
+	GLuint m_AOmaptexLocation;
+	GLuint m_AOleveltexLocation;
+	GLuint m_AOmaxLocation;
+
 	GLuint m_ShowAOLocation;
 	GLuint m_ShowTextureLocation;
 
 	GLuint m_hlevelLocation;
 	GLuint m_hlevel1Location;
+
+	GLuint m_ntexLocation;
+	GLuint m_btexLocation;
+	GLuint m_normalmapLocation;
+	GLuint m_normallevelLocation;
 
 	struct {
 		GLuint Color;

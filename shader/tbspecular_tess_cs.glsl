@@ -1,8 +1,7 @@
 #version 410
 
 layout(vertices = 4) out;
-uniform sampler2D vtex;
-uniform sampler2D Satmap;
+
 
 // attributes of the input CPs                                                                  
 in vec3 Position_CS_in[];
@@ -11,15 +10,41 @@ in vec3 Position_CS_in[];
 out vec3 Position_ES_in[];
 out vec3 outgrid[];
 
+uniform sampler2D texHLevel;
+uniform sampler2D texHLevel1;
+uniform sampler2D vtex;
+uniform sampler2D texHeightmap;
+uniform sampler2D Satmap;
+
+uniform sampler2D texaolevel;
+uniform sampler2D texaomaxdiff;
+
+uniform mat4 gWVP;
+uniform vec4 currentPos;
+
 const float VIEWCHUNKNUMBER = 16.0;
-const float MAXSCALE = 200.0 * VIEWCHUNKNUMBER / 4.0;
 const float CHUNKNUMBER = 32.0;
 const float CHUNKSIZE = 512.0;
-const double htop = 40000.0;
-const double ep = 60.0;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
+
+const float htop = 40000.0;
+const float ep = 60.0;
 
 const float WIDTH = 1024;
 const float HEIGHT = 720;
+
+double ParseDouble(vec4 result)
+{
+  int r = int(result.r * 65535);
+  int g = int(result.g * 65535);
+  int b = int(result.b * 65535);
+  int a = int(result.a * 65535);
+  int sign = a >> 15;
+  int exponent = (a - sign << 15) >> 4;
+  double ret = double((a - sign << 15 - exponent << 4) * pow(2.0, -3)) + double(b * pow(2.0,-19)) +   double(g * pow(2.0,-35)) +  double(r * pow(2.0,-51));
+  ret = ret * double(pow(2.0,exponent));
+  return ret;
+}
 
 void main()
 {
@@ -50,26 +75,28 @@ void main()
 
   double satvalue = 0;
   int grid = 0;
+  int maxaolevel = 6;
+  float maxaoerror = 0;
+
+   for (int x = blx; x <= brx; x++)
+    for (int y = bly; y <= bry; y++) {
+	  float deltax = x / CHUNKNUMBER;
+	  float deltay = y / CHUNKNUMBER;
+
+	  int level = int(texture(texaolevel, vec2(deltax,deltay)).r * 255);
+	  if(level < maxaolevel) maxaolevel = level;
+
+	  float aoerror = texture(texaomaxdiff, vec2(deltax,deltay)).r;
+	  if(maxaoerror < aoerror) maxaoerror = aoerror;
+	}
 
   for (int x = blx; x <= brx; x++)
     for (int y = bly; y <= bry; y++) {
-	int localLx, localLy, localRx, localRy;
-	  if(x == blx) localLx = lx * CHUNKNUMBER * CHUNKSIZE;
-	  else localLx = x * CHUNKSIZE;
+	
+	  float deltax = x / CHUNKNUMBER;
+	  float deltay = y / CHUNKNUMBER;
 
-	  if(x == brx) localRx = rx * CHUNKNUMBER * CHUNKSIZE;
-	  else localRx = (x + 1) * CHUNKSIZE - 1;
-
-	  if(y == bly) localLy = ly * CHUNKNUMBER * CHUNKSIZE;
-	  else localLy = y * CHUNKSIZE;
-
-	  if(y == bry) localRy = ry * CHUNKNUMBER * CHUNKSIZE;
-	  else localRy = (y + 1) * CHUNKSIZE - 1;
-
-	  float delatx = (float)x / CHUNKNUMBER;
-	  float delaty = (float)y / CHUNKNUMBER;
-
-	  int level = (int)(texture(texHLevel, vec2(deltax,deltay)).r);
+	  int level = int(texture(texHLevel, vec2(deltax,deltay)).r);
 	  
 	  int templevel = 6 - level;
 	  if(grid < templevel) 
@@ -79,62 +106,81 @@ void main()
 	     break;
 	  }
 
-	  localLx = x * CHUNKSIZE + (int)((localLx - (int)((int)(x / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
-	  localRx = x * CHUNKSIZE +(int)((localRx - (int)((int)(x / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
-	  localLy = y * CHUNKSIZE +(int)((localLy - (int)((int)(y / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
-	  localRy = y * CHUNKSIZE +(int)((localRy - (int)((int)(y / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
+	  int localLx, localLy, localRx, localRy;
+	  if(x == blx) localLx = int(lx * CHUNKNUMBER * CHUNKSIZE);
+	  else localLx = int(x * CHUNKSIZE);
 
-	  float yposbottom =  1.0 * localLy / float(CHUNKSIZE * CHUNKNUMBER);
-	  float ypostop = 1.0 * localRy / float(CHUNKSIZE * CHUNKNUMBER);
-	  float xposleft = 1.0 * localLx / float(CHUNKSIZE * CHUNKNUMBER);
-	  float xposright = 1.0 * localRx / float(CHUNKSIZE * CHUNKNUMBER);
+	  if(x == brx) localRx = int(rx * CHUNKNUMBER * CHUNKSIZE);
+	  else localRx = int((x + 1) * CHUNKSIZE - 1);
+
+	  if(y == bly) localLy = int(ly * CHUNKNUMBER * CHUNKSIZE);
+	  else localLy = int(y * CHUNKSIZE);
+
+	  if(y == bry) localRy = int(ry * CHUNKNUMBER * CHUNKSIZE);
+	  else localRy = int((y + 1) * CHUNKSIZE - 1);
+
+
+//	  localLx = int(x * CHUNKSIZE) + int((localLx - int(int(x / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
+//	  localRx = int(x * CHUNKSIZE) + int((localRx - int(int(x / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
+//	  localLy = int(y * CHUNKSIZE) + int((localLy - int(int(y / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
+//	  localRy = int(y * CHUNKSIZE) + int((localRy - int(int(y / pow(2.0, level)) * pow(2.0,level)) * CHUNKSIZE) / pow(2.0,level));
+
+	  float yposbottom =  1.0 * localLy / (CHUNKSIZE * CHUNKNUMBER);
+	  float ypostop = 1.0 * localRy / (CHUNKSIZE * CHUNKNUMBER);
+	  float xposleft = 1.0 * localLx / (CHUNKSIZE * CHUNKNUMBER);
+	  float xposright = 1.0 * localRx / (CHUNKSIZE * CHUNKNUMBER);
 
 	  vec4 scaleBias = textureLod(vtex, vec2(xposleft,yposbottom), level);
-	  vec2 pCoor = uv * scaleBias.x + scaleBias.zw;
+	  vec2 pCoor = vec2(xposleft,yposbottom) * scaleBias.x + scaleBias.zw;
 	  vec4 sat = texture(Satmap, pCoor);
-	  double lbret = double(sat.r / 256.0) + double(sat.g / 256.0 / 256.0) + double(sat.b / 256.0 / 256.0 / 256.0) + double(sat.a / 256.0 / 256.0 / 256.0 / 256.0);
+	  double lbret = ParseDouble(sat);
 
 	  scaleBias = textureLod(vtex, vec2(xposright,yposbottom), level);
-	  pCoor = uv * scaleBias.x + scaleBias.zw;
+	  pCoor = vec2(xposright,yposbottom) * scaleBias.x + scaleBias.zw;
 	  sat = texture(Satmap, pCoor);
-	  double rbret = double(sat.r / 256.0) + double(sat.g / 256.0 / 256.0) + double(sat.b / 256.0 / 256.0 / 256.0) + double(sat.a / 256.0 / 256.0 / 256.0 / 256.0);
+	  double rbret = ParseDouble(sat);
 
 	  scaleBias = textureLod(vtex, vec2(xposleft,ypostop), level);
-	  pCoor = uv * scaleBias.x + scaleBias.zw;
+	  pCoor = vec2(xposleft,ypostop) * scaleBias.x + scaleBias.zw;
 	  sat = texture(Satmap, pCoor);
-	  double ltret = double(sat.r / 256.0) + double(sat.g / 256.0 / 256.0) + double(sat.b / 256.0 / 256.0 / 256.0) + double(sat.a / 256.0 / 256.0 / 256.0 / 256.0);
+	  double ltret = ParseDouble(sat);
 
 	  scaleBias = textureLod(vtex, vec2(xposright,ypostop), level);
-	  pCoor = uv * scaleBias.x + scaleBias.zw;
+	  pCoor = vec2(xposright,ypostop) * scaleBias.x + scaleBias.zw;
 	  sat = texture(Satmap, pCoor);
-	  double rtret = double(sat.r / 256.0) + double(sat.g / 256.0 / 256.0) + double(sat.b / 256.0 / 256.0 / 256.0) + double(sat.a / 256.0 / 256.0 / 256.0 / 256.0);
+	  double rtret = ParseDouble(sat);
 
 	  double ret = rtret - ltret - rbret + lbret;
 
-	  ret = pow(ret, 1.0 / ep);
-	  ret = ret * htop;
-	  ret = ret / double(pow(2.0, level));
+	  ret = sqrt(ret);
+	  ret = sqrt(ret);
 
-	  if(satvalue < ret) satvalue = ret;
+	  float retf = float(ret);
+	  retf = pow(retf, 1.0 / ep * 4);
+	  retf = retf;
+	  retf = retf * htop;
+	  retf = retf / pow(2.0, level);
+
+	  if(satvalue < retf) satvalue = retf;
 	}
 
 if(grid < 6)
 {
-	vec4 center = 0.25 * (Position_ES_in[0] + Position_ES_in[1] + Position_ES_in[2] + Position_ES_in[3]);
+	vec4 center = vec4(0.25 * (Position_ES_in[0] + Position_ES_in[1] + Position_ES_in[2] + Position_ES_in[3]), 1.0);
 	float Dp = sqrt(center.x * center.x + center.z * center.z);
-	vec4 maxside = Position_ES_in[2] - Position_ES_in[0];
+	vec4 maxside = vec4(Position_ES_in[2] - Position_ES_in[0],1.0);
 	float s = sqrt(maxside.x * maxside.x + maxside.z * maxside.z) / 2.0;
 	float d = 1 - s / Dp;
 	if(d > 0)
 	{
-	  for(i = 0; i < 6 - grid;)
+	  for(int i = 0; i < 6 - grid; i++)
 	  {
 	    center.y = -currentPos.z;
 	    center = center * d;
 	    center.y += currentPos.z;
 	    center.w = 1.0;
 	    vec4 p = center;
-	    p.y = center.y +  satvalue / 2;
+	    p.y = center.y +  float(satvalue / 2);
 	    center = gWVP * center;
 		p = gWVP * center;
 		float xPixel = (abs(center.x - p.x)) * WIDTH;
@@ -144,10 +190,10 @@ if(grid < 6)
 		{
 		  break;
 		}
-		 grid = gird + 1;
+		 grid = grid + 1;
 		 satvalue = satvalue / 2.0;
 	  }
-	  grid = (int) pow(2.0,grid);
+	  grid = int(pow(2.0,grid));
 	}
 	else
 	{
@@ -159,7 +205,13 @@ else
   grid = 64;
 }
 
-  outgrid[gl_InvocationID] = vec3(1.0 * grid / 64, 0, 0);
+  float aoflag = 0.0; // aoflag : 1.0表示在vertex shader，0.0在fragment shader；
+
+   grid = clamp(grid, 8, 64);
+
+  if(grid >= pow(2.0, (6 - maxaolevel) + int(maxaoerror / 0.2))) aoflag = 1.0;
+ 
+  outgrid[gl_InvocationID] = vec3(1.0 * grid / 64, aoflag, 0);
 
   gl_TessLevelOuter[0] = Position_ES_in[1].y;
   gl_TessLevelOuter[1] = Position_ES_in[2].y;

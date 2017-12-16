@@ -1,6 +1,5 @@
 #include "frameBuffer.h"
 #include "util.h"
-#include "texture.hpp"
 
 FrameBuffer::FrameBuffer() {
 	valid = false;
@@ -48,7 +47,7 @@ void FrameBuffer::init(int screenWidth, int screenHeight) {
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	m_shader.Init();
+//	m_shader.Init();
 
 	glGenVertexArrays(1, &quadVAO);
 	glGenBuffers(1, &quadVBO);
@@ -113,7 +112,7 @@ void FrameBuffer::savetoImage()
 		begin();
 		glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, (void*)data);
 		end();
-		SaveImage(data, width, height, "test_lod.png");
+		//SaveImage(data, width, height, "test_lod.png");
 	}
 	saved = true;
 }

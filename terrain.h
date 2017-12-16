@@ -7,22 +7,17 @@
 #include "shaderuniform.h"
 #include "VTex.h"
 #include "light.h"
-#include "tessbumpspecular.h"
-#include "tessbump.h"
-#include "tessbumpborder.h"
 #include "framebuffer.h"
-#include "tessbumpvt.h"
+#include "shadervt.h"
+#include "shaderspecular.h"
 
-#define MaxBlockNumber 64 * 16 * 4
-#define MaxRegionScan  1.0 / 2.0
-#define Bump_Area  1.0 / 10.0
+#define MaxBlockNumber 64 * 64 * 4
 
-class TessBumpBlock {
+class TerrainBlock {
 public:
-	TessBumpBlock(int index)
+	TerrainBlock(int index)
 	{
 		blockID = index;
-
 		BRDF = 0;
 		visible = true;
 		isparent = false;
@@ -30,9 +25,10 @@ public:
 
 		for (int i = 0; i < 4; i++)
 			isboundary[i] = true;
+
 	}
 
-	~TessBumpBlock()
+	~TerrainBlock()
 	{
 
 	}
@@ -41,47 +37,36 @@ public:
 	{
 		if (visible && !isparent && centerlevel <= 0 && !ishorizon)
 		{
-			BRDF = 1;
+			//	BRDF = 1;
 		}
 	}
 
 	glm::vec3 vertices[4];
-	int blockID;
 	int BRDF;
-	float regionarea;
+	int blockID;
 	bool visible;
 	bool isparent;
+	float regionarea;
 	bool ishorizon;
 	int boundary[4];
 	bool isboundary[4];
 	int level;
 	int centerlevel;
+	int lx, rx, ly, ry;
 };
 
-
-class TessBumpTerrain {
+class Terrain {
 public:
-	TessBumpTerrain()
+	Terrain()
 	{
-		AOflag = 1;
-		m_Textureflag = 1;
-		m_linemode = 0;
-		lineon = false;
-		transferdata = true;
-
-		lastPos = glm::vec3(-50.0, -50.0, -50.0);
-		lastDir = glm::vec3(0.0, 0.0, 0.0);
-
-		m_directionalLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-		m_directionalLight.AmbientIntensity = 0.0f;
-		m_directionalLight.DiffuseIntensity = 0.0f;
-		m_directionalLight.Direction = glm::vec3(1.0f, -1.0, 0.0);
+		m_SGlight.lambda = 1.0;
+		m_SGlight.p = glm::vec3(1.0,1.0,1.0);
+		m_SGlight.mu = glm::vec3(1.0, 1.0, 1.0);
 	}
 
-	~TessBumpTerrain()
+	~Terrain()
 	{
-		m_Block.clear();
-		m_vertices.clear();
+
 	}
 
 	bool Init();
@@ -95,7 +80,6 @@ public:
 	float m_ar;
 	float m_fov;
 
-	DirectionalLight m_directionalLight;
 	glm::vec3 currentPos;
 	glm::vec3 currentDir;
 	glm::vec3 m_camerapos;
@@ -103,12 +87,15 @@ public:
 	glm::vec3 lastPos;
 	glm::vec3 lastDir;
 
-	int AOflag;
-	int m_Textureflag;
-	int m_Shadowflag;
+	glm::vec3 needlastPos;
+	glm::vec3 needlastDir;
+
+	SGLight m_SGlight;
+
 	int m_linemode;
 	bool lineon;
 	bool geometryclipmap;
+	int m_Textureflag;
 
 private:
 	bool InitTexture();
@@ -117,23 +104,24 @@ private:
 	void updateHtex(float currentX, float currentY, float currentZ);
 	void updateBtex();
 	void InitVertices();
-	void ViewFrustum();
-	void ChildBorderCrack(TessBumpBlock &tblock);
-	void BorderCrack(TessBumpBlock &tblock);
 
-	void updateBlock(float currentX, float currentZ, TessBumpBlock& tblock);
+	void updateBlock(float currentX, float currentZ, TerrainBlock& tblock);
 
 	void updateBlock();
 
+	void ChildBorderCrack(TerrainBlock &tblock);
+	void BorderCrack(TerrainBlock &tblock);
+
+	void ViewFrustum();
+	void NeedTransferData();
+
 	void VTPassGenerateVertices();
 	void RenderPassGenerateVertices();
+	
+	VTex htex, btex, ntex, vistex;
 
-	VTex htex, btex, ntex;
-
-	bool transferdata;
-
-	std::vector<TessBumpBlock> m_Block;
-	std::vector<TessBumpBlock> m_Child;
+	std::vector<TerrainBlock> m_Block;
+	std::vector<TerrainBlock> m_Child;
 
 	std::vector<glm::vec3> m_vtvertices;
 	std::vector<glm::vec3> m_vertices;
@@ -143,23 +131,21 @@ private:
 	GLuint vao[4];
 	GLuint vbo[4];
 
-	FrameBuffer feedback;
-
-	GLuint colortexture;
-
-	GLuint Maxmintexture;
-
-	bool needUpdate[CHUNKNUMBER][CHUNKNUMBER];
-
 	GLuint hLevelTex, hLevelTex1;
 	unsigned char hLevel1[CHUNKNUMBER * CHUNKNUMBER];
 	float hLevel[CHUNKNUMBER * CHUNKNUMBER];
 
-	TessBumpShadervt m_vtshader;
-	TessBumpShader_Specular m_specular;
-	TessBumpShader_Bump m_bump;
-	TessBumpShader_Border m_border;
+	FrameBuffer feedback;
+
+	bool needUpdate[CHUNKNUMBER][CHUNKNUMBER];
+
+	bool transferdata;
+	bool needtranfersdata;
+
+	GLuint colortexture;
+
+	Shadervt m_vtshader;
+	Shader_Specular m_specular;
 };
 
 #endif
-

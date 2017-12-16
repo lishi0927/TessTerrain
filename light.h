@@ -17,6 +17,8 @@ const std::string texnames[] = { "xsc_db001_1748.tga", "fb_jjc_cd002_2161.tga",
 "xsc_db001_1748_n.tga", "xsc_dbcd007_1201_n.tga",
 "xsc_dbsk006_1201_n.tga" };
 
+#define MAX_SG_LIGHTS 2
+
 struct BaseLight
 {
 	glm::vec3 Color;
@@ -71,6 +73,13 @@ struct SpotLight : public PointLight
 		Direction = glm::vec3(0.0f, 0.0f, 0.0f);
 		Cutoff = 0.0f;
 	}
+};
+
+struct SGLight
+{
+	glm::vec3 p; // lobe axis
+	float lambda; // sharpness
+	glm::vec3 mu; // amplitude
 };
 
 #endif

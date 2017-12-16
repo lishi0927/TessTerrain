@@ -6,7 +6,8 @@ in vec3 outgrid[];
 
 out vec2 uv;
 out vec3 WorldPos0;
-out float grid;
+out vec4 grid;
+out float AO;
 
 uniform mat4 gWVP;
 uniform mat4 gWorld;
@@ -17,18 +18,21 @@ uniform sampler2D texHLevel1;
 uniform sampler2D vtex;
 uniform sampler2D texHeightmap;
 
+uniform sampler2D aotex;
+uniform sampler2D texAOmap;
+uniform sampler2D texaolevel;
+
 const float VIEWCHUNKNUMBER = 16.0;
-const float MAXSCALE = 200.0 * VIEWCHUNKNUMBER / 4.0;
 const float CHUNKNUMBER = 32.0;
 const float CHUNKSIZE = 512.0;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
+
 
 void main()
 {
 
 	float u = gl_TessCoord.x;
     float v = gl_TessCoord.y;
-
-	newuv = vec2(u,v);
 
 	vec3 a = mix(Position_ES_in[1],Position_ES_in[0], u);
 	vec3 b = mix(Position_ES_in[2],Position_ES_in[3], u);
@@ -38,6 +42,7 @@ void main()
 	float level = texture(texHLevel, uv).r;
 	float ratio = fract(level);
 	level -= ratio;
+	grid.w = level / 6.0;
 	vec4 scaleBias = textureLod(vtex, uv, level);
 	level = texture(texHLevel1, uv).r;
 	level *= 255;
@@ -55,6 +60,18 @@ void main()
 
 	WorldPos0 = (gWorld * vec4(position, 1.0)).xyz;
 
-	grid = outgrid[0].x;
+	grid.xy = outgrid[0].xy;
+
+	AO = 0.0;
+
+	if(grid.y == 1.0)
+	{
+	   level = texture(texaolevel, uv).r;
+	   level *= 255;
+	   scaleBias = textureLod(aotex, uv, level);
+	   pCoor = uv * scaleBias.x + scaleBias.zw;
+       AO = texture(texAOmap, pCoor).r;
+	   grid.z = level / 6.0;
+	}
 }
 

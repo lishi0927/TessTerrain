@@ -9,34 +9,35 @@ int boundary_index[13][4] = { { 8,16,8,16 },{ 8,16,16,16 },{ 8,16,16,16 },{ 8,16
 
 int child_index[4][4] = { { 2,1,2,1 },{ 1,2,2,1 },{ 1,2,1,2 },{ 2,1,1,2 } };
 
-void TessBumpTerrain::InitVertices() {
-
+void Terrain::InitVertices()
+{
 	int index = 1;
 	float r = 1.0 * MAXSCALE;
 
-	for (int l = 0; l < LEVEL; l++) {
-		for (int i = -2; i < 2; i++)
-			for (int j = -2; j < 2; j++) {
-				if (l != LEVEL - 1 && i != -2 && i != 1 && j != -2 && j != 1)
-					continue;
-				TessBumpBlock new_block(index++);
-				new_block.vertices[0] = glm::vec3(r*i, 0, r*j);
-				new_block.vertices[1] = glm::vec3(r*(i + 1), 0, r*j);
-				new_block.vertices[2] = glm::vec3(r*(i + 1), 0, r*(j + 1));
-				new_block.vertices[3] = glm::vec3(r*i, 0, r*(j + 1));
+	r = MAXSCALE * 4 / 32;
 
-				new_block.level = 0;
-				new_block.centerlevel = l;
+	float offset = MAXSCALE * 2;
 
-				m_Block.push_back(new_block);
-			}
-		r *= 0.5;
+	for (int i = 0; i< 32; i++)
+	{
+		for (int j = 0; j < 32; j++)
+		{
+			TerrainBlock new_block(index++);
+			new_block.vertices[0] = glm::vec3(r*i - offset, 0, r*j - offset);
+			new_block.vertices[1] = glm::vec3(r*(i + 1) - offset, 0, r*j - offset);
+			new_block.vertices[2] = glm::vec3(r*(i + 1) - offset, 0, r*(j + 1) - offset);
+			new_block.vertices[3] = glm::vec3(r*i - offset, 0, r*(j + 1) - offset);
+
+			new_block.level = 0;
+			new_block.centerlevel = 0;
+
+			m_Block.push_back(new_block);
+		}
 	}
+	glGenVertexArrays(2, vao);
+	glGenBuffers(2, vbo);
 
-	glGenVertexArrays(4, vao);
-	glGenBuffers(4, vbo);
-
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		glBindVertexArray(vao[i]);
 
@@ -65,11 +66,13 @@ void TessBumpTerrain::InitVertices() {
 			int index = i % 12;
 			memcpy(m_Block[i].boundary, boundary_index[index], 4 * sizeof(int));
 		}
+		for (int j = 0; j<4; j++)
+			m_Block[i].boundary[j] = 32;
 	}
 
 }
 
-bool TessBumpTerrain::InitTexture()
+bool Terrain::InitTexture()
 {
 	string filename;
 	int w, h, channels, type;
@@ -93,9 +96,35 @@ bool TessBumpTerrain::InitTexture()
 	return true;
 }
 
-void TessBumpTerrain::InitHeightLevel()
+bool Terrain::InitShader()
 {
-	memset(hLevel, 0, sizeof(hLevel));
+	m_vtshader.Init();
+	m_vtshader.Enable();
+	m_vtshader.SetVtex(0);
+	m_vtshader.SetHeightmap(1);
+	m_vtshader.SetHLevel(2);
+	m_vtshader.SetHLevel1(3);
+	glUseProgram(0);
+
+	m_specular.Init();
+	m_specular.Enable();
+	m_specular.SetVtex(0);
+	m_specular.SetHeightmap(1);
+	m_specular.SetHLevel(2);
+	m_specular.SetHLevel1(3);
+	m_specular.SetBtex(4);
+	m_specular.SetColortex(5);
+	m_specular.SetNtex(6);
+	m_specular.SetNormaltex(7);
+	m_specular.SetVisTexture(8);
+	m_specular.SetVisPageTexture(9);
+
+	glUseProgram(0);
+	return true;
+}
+
+void Terrain::InitHeightLevel()
+{
 	glGenTextures(1, &hLevelTex);
 	glBindTexture(GL_TEXTURE_2D, hLevelTex);
 	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
@@ -115,63 +144,45 @@ void TessBumpTerrain::InitHeightLevel()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, CHUNKNUMBER, CHUNKNUMBER, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	memset(hLevel, 0, sizeof(hLevel));
+	memset(hLevel1, 0, sizeof(hLevel1));
 }
 
-bool TessBumpTerrain::InitShader()
-{
-	m_specular.Init();
-	m_specular.Enable();
-	m_specular.SetVtex(0);
-	m_specular.SetHeightmap(1);
-	m_specular.SetColortex(2);
-	m_specular.SetHLevel(3);
-	m_specular.SetHLevel1(4);
-	glUseProgram(0);
-
-	m_bump.Init();
-	m_bump.Enable();
-	m_bump.SetVtex(0);
-	m_bump.SetHeightmap(1);
-	m_bump.SetColortex(2);
-	m_bump.SetHLevel(3);
-	m_bump.SetHLevel1(4);
-	glUseProgram(0);
-
-	m_border.Init();
-	m_border.Enable();
-	m_border.SetVtex(0);
-	m_border.SetHeightmap(1);
-	m_border.SetColortex(2);
-	m_border.SetHLevel(3);
-	m_border.SetHLevel1(4);
-	glUseProgram(0);
-}
-
-bool TessBumpTerrain::Init()
+bool Terrain::Init()
 {
 	InitVertices();
 
 	InitShader();
 
-	//初始化，合成texture
-//	if (!InitTexture()) return false;
+	InitHeightLevel();
 
 	GLint MaxPatchVertices = 0;
 	glGetIntegerv(GL_MAX_PATCH_VERTICES, &MaxPatchVertices);
 	printf("Max supported patch vertices %d\n", MaxPatchVertices);
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
 
+	feedback.init(FEEDBACK_WIDTH, FEEDBACK_HEIGHT);
+
 	htex.init(CHUNKSIZE, CHUNKNUMBER, "dem", LEVELOFTERRAIN);
 	btex.init(BLENDSIZE, CHUNKNUMBER, "texture", LEVELOFBLENDTEX);
-	ntex.init(CHUNKSIZE, CHUNKNUMBER, "normal", LEVELOFTERRAIN);
+	ntex.init(CHUNKSIZE, CHUNKNUMBER, "newnormal", LEVELOFTERRAIN);
+	vistex.init(CHUNKSIZE, CHUNKNUMBER, "Vis", LEVELOFTERRAIN);
 
-	m_directionalLight.AmbientIntensity = 0.9f;
-	m_directionalLight.DiffuseIntensity = 0.5f;
-	m_directionalLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-	m_directionalLight.Direction = glm::vec3(-1.0f, -1.0f, 0.0f);
+	VTex::initThread();
+	htex.clear();
+	htex.loadCoarsest();
+	btex.clear();
+	btex.loadCoarsest();
+	ntex.clear();
+	ntex.loadCoarsest();
+	vistex.clear();
+	vistex.loadCoarsest();
+
+	return true;
 }
 
-void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock &tblock)
+void Terrain::updateBlock(float currentX, float currentZ, TerrainBlock &tblock)
 {
 	int xs, xb, ys, yb, zs, zb;
 	xs = xb = ys = yb = zs = zb = 0;
@@ -181,8 +192,8 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 	maxx = maxy = -1;
 
 	for (int i = 0; i < 4; i++)
-		for (int k = 0; k <= 1; k++) {
-			glm::vec4 pos = glm::vec4(tblock.vertices[i], 1.0) + glm::vec4(0.0, k * 200, 0.0, 0.0);
+		for (int k = -1; k <= 1; k = k + 2) {
+			glm::vec4 pos = glm::vec4(tblock.vertices[i], 1.0) + glm::vec4(0.0, k * 4000, 0.0, 0.0);
 			pos = m_WVP * pos;
 			xs = (pos.x < -pos.w) ? xs + 1 : xs;
 			xb = (pos.x > pos.w) ? xb + 1 : xb;
@@ -190,10 +201,10 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 			yb = (pos.y > pos.w) ? yb + 1 : yb;
 			zs = (pos.z < -pos.w) ? zs + 1 : zs;
 			zb = (pos.z > pos.w) ? zb + 1 : zb;
-//			minx = clampf(Min(pos.x / pos.w, minx), -1, 1);
-//			miny = clampf(Min(pos.y / pos.w, miny), -1, 1);
-//			maxx = clampf(Max(pos.x / pos.w, maxx), -1, 1);
-//			maxy = clampf(Max(pos.y / pos.w, maxy), -1, 1);
+			//			minx = clampf(Min(pos.x / pos.w, minx), -1, 1);
+			//			miny = clampf(Min(pos.y / pos.w, miny), -1, 1);
+			//			maxx = clampf(Max(pos.x / pos.w, maxx), -1, 1);
+			//			maxy = clampf(Max(pos.y / pos.w, maxy), -1, 1);
 		}
 	if (xs == 8 || xb == 8 || ys == 8 || yb == 8 || zs == 8 || zb == 8)
 	{
@@ -206,24 +217,26 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 		return;
 	}
 
-//	tblock.regionarea = (maxx - minx) * (maxy - miny);
+	//	tblock.regionarea = (maxx - minx) * (maxy - miny);
 
-	float sidelength = tblock.vertices[3].x - tblock.vertices[0].x;
+	float sidelength = tblock.vertices[1].x - tblock.vertices[0].x;
 	float heightresolution = sidelength * (VIEWCHUNKNUMBER * CHUNKSIZE / 4.0 / MAXSCALE);
 
-	if (heightresolution > 64)
+	if (heightresolution > 32)
 	{
 		tblock.isparent = true;
 		//tblock.child = m_Block.size() + m_Child.size() + 1;
-		TessBumpBlock temperror = tblock;
+		TerrainBlock temperror = tblock;
 
-		TessBumpBlock tempchild1(m_Block.size() + m_Child.size() + 1);
+		TerrainBlock tempchild1(m_Block.size() + m_Child.size() + 1);
 		tempchild1.level = tblock.level + 1;
 		tempchild1.centerlevel = tblock.centerlevel;
 		//tempchild1.parent = tblock.blockID;
 		for (int j = 0; j < 4; j++)
 		{
-			tempchild1.boundary[j] = tblock.boundary[j] / child_index[0][j];
+			if (child_index[0][j] == 1)tempchild1.boundary[j] = 16;
+			else
+				tempchild1.boundary[j] = tblock.boundary[j] / child_index[0][j];
 		}
 		tempchild1.vertices[0] = tblock.vertices[0];
 		tempchild1.vertices[1] = float(0.5) * (tblock.vertices[0] + tblock.vertices[1]);
@@ -232,12 +245,14 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 		m_Child.push_back(tempchild1);
 
 		if (tblock.blockID < 0) tblock = temperror;
-		TessBumpBlock tempchild2(m_Block.size() + m_Child.size() + 1);
+		TerrainBlock tempchild2(m_Block.size() + m_Child.size() + 1);
 		tempchild2.level = tblock.level + 1;
 		//tempchild2.parent = tblock.blockID;
 		for (int j = 0; j < 4; j++)
 		{
-			tempchild2.boundary[j] = tblock.boundary[j] / child_index[1][j];
+			if (child_index[1][j] == 1)tempchild2.boundary[j] = 16;
+			else
+				tempchild2.boundary[j] = tblock.boundary[j] / child_index[1][j];
 		}
 		tempchild2.centerlevel = tblock.centerlevel;
 		tempchild2.vertices[0] = float(0.5) * (tblock.vertices[0] + tblock.vertices[1]);
@@ -247,12 +262,14 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 		m_Child.push_back(tempchild2);
 
 		if (tblock.blockID < 0) tblock = temperror;
-		TessBumpBlock tempchild3(m_Block.size() + m_Child.size() + 1);
+		TerrainBlock tempchild3(m_Block.size() + m_Child.size() + 1);
 		tempchild3.level = tblock.level + 1;
 		//tempchild3.parent = tblock.blockID;
 		for (int j = 0; j < 4; j++)
 		{
-			tempchild3.boundary[j] = tblock.boundary[j] / child_index[2][j];
+			if (child_index[2][j] == 1)tempchild3.boundary[j] = 16;
+			else
+				tempchild3.boundary[j] = tblock.boundary[j] / child_index[2][j];
 		}
 		tempchild3.centerlevel = tblock.centerlevel;
 		tempchild3.vertices[0] = float(0.25) * (tblock.vertices[0] + tblock.vertices[1] + tblock.vertices[2] + tblock.vertices[3]);
@@ -262,12 +279,14 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 		m_Child.push_back(tempchild3);
 
 		if (tblock.blockID < 0) tblock = temperror;
-		TessBumpBlock tempchild4(m_Block.size() + m_Child.size() + 1);
+		TerrainBlock tempchild4(m_Block.size() + m_Child.size() + 1);
 		tempchild4.level = tblock.level + 1;
 		//tempchild4.parent = tblock.blockID;
 		for (int j = 0; j < 4; j++)
 		{
-			tempchild4.boundary[j] = tblock.boundary[j] / child_index[3][j];
+			if (child_index[3][j] == 1)tempchild4.boundary[j] = 16;
+			else
+				tempchild4.boundary[j] = tblock.boundary[j] / child_index[3][j];
 		}
 		tempchild4.centerlevel = tblock.centerlevel;
 		tempchild4.vertices[0] = float(0.5) * (tblock.vertices[0] + tblock.vertices[3]);
@@ -278,7 +297,7 @@ void TessBumpTerrain::updateBlock(float currentX, float currentZ, TessBumpBlock 
 	}
 }
 
-void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
+void Terrain::updateHtex(float currentX, float currentY, float currentZ)
 {
 	m_Child.clear();
 
@@ -291,10 +310,10 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 		if (m_Block[i].visible && !m_Block[i].isparent)
 		{
 			int lx, rx, ly, ry;
-			lx = m_Block[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
-			rx = m_Block[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
-			ly = m_Block[i].vertices[0].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
-			ry = m_Block[i].vertices[2].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			m_Block[i].lx = lx = m_Block[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			m_Block[i].rx = rx = m_Block[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			m_Block[i].ly = ly = m_Block[i].vertices[0].z / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			m_Block[i].ry = ry = m_Block[i].vertices[2].z / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
 
 			int maxCoor = CHUNKNUMBER;
 			clamp(lx, 0, maxCoor);
@@ -316,10 +335,10 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 		if (m_Child[i].visible && !m_Child[i].isparent)
 		{
 			int lx, rx, ly, ry;
-			lx = m_Child[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
-			rx = m_Child[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
-			ly = m_Child[i].vertices[0].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
-			ry = m_Child[i].vertices[2].y / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			m_Child[i].lx = lx = m_Child[i].vertices[0].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			m_Child[i].rx = rx = m_Child[i].vertices[1].x / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentX * CHUNKNUMBER;
+			m_Child[i].ly = ly = m_Child[i].vertices[0].z / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
+			m_Child[i].ry = ry = m_Child[i].vertices[2].z / MAXSCALE / 4 * VIEWCHUNKNUMBER + currentZ * CHUNKNUMBER;
 
 			int maxCoor = CHUNKNUMBER;
 			clamp(lx, 0, maxCoor);
@@ -333,10 +352,10 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 				}
 		}
 	}
-	int geolevel[1<<LEVEL-1][1 << LEVEL - 1];
+	int geolevel[1 << LEVEL - 1][1 << LEVEL - 1];
 
 	htex.clear();
-	htex.update(currentX, currentZ, currentY, hLevel, hLevel1, m_WVP,geolevel,false,needUpdate);
+	htex.update(currentX, currentZ, currentY, hLevel, hLevel1, m_WVP, geolevel, false, needUpdate);
 	htex.checkThreadState();
 	htex.generateTex();
 
@@ -349,7 +368,7 @@ void TessBumpTerrain::updateHtex(float currentX, float currentY, float currentZ)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void TessBumpTerrain::updateBtex()
+void Terrain::updateBtex()
 {
 	static float data[FEEDBACK_WIDTH * FEEDBACK_HEIGHT * 4];
 	static set<pair<int, int> > bSet;
@@ -359,8 +378,10 @@ void TessBumpTerrain::updateBtex()
 	feedback.end();
 	btex.clear();
 	ntex.clear();
+	vistex.clear();
 	ntex.checkThreadState();
 	btex.checkThreadState();
+	vistex.checkThreadState();
 
 	float horizondata[FEEDBACK_WIDTH];
 #pragma omp parallel for schedule(dynamic, 1)
@@ -395,6 +416,7 @@ void TessBumpTerrain::updateBtex()
 				if (bSet.find(make_pair(l, ty * (CHUNKNUMBER >> l) + tx)) == bSet.end()) {
 					ntex.update(l, tx, ty, false);
 					btex.update(l, tx, ty, false);
+					vistex.update(l, tx, ty, false);
 					bSet.insert(make_pair(l, ty * (CHUNKNUMBER >> l) + tx));
 					tot++;
 				}
@@ -405,6 +427,7 @@ void TessBumpTerrain::updateBtex()
 						tot++;
 						ntex.update(l, tx, ty, false);
 						btex.update(l, tx, ty, false);
+						vistex.update(l, tx, ty, false);
 						bSet.insert(make_pair(l, ty * (CHUNKNUMBER >> r) + tx));
 					}
 				}
@@ -412,34 +435,37 @@ void TessBumpTerrain::updateBtex()
 	}
 	btex.generateTex();
 	ntex.generateTex();
-
+	vistex.generateTex();
+/*
 #pragma omp parallel for schedule(dynamic, 1)
 	{
 		for (int i = 0; i < FEEDBACK_WIDTH; i++)
 		{
 			int id = horizondata[i] * (m_Block.size() + m_Child.size());
+			if (id <= 0 || id >= m_Block.size() + m_Child.size()) continue;
 			if (id <= m_Block.size())
 				m_Block[id - 1].ishorizon = true;
 			else
 				m_Child[id - m_Block.size() - 1].ishorizon = true;
 		}
 	}
+*/
 }
 
-void TessBumpTerrain::updateBlock()
+void Terrain::updateBlock()
 {
 	for (int i = 0; i < m_Block.size(); i++)
 	{
 		m_Block[i].ChangeBRDF();
 	}
+
 	for (int i = 0; i < m_Child.size(); i++)
 	{
 		m_Child[i].ChangeBRDF();
 	}
-
 }
 
-void TessBumpTerrain::ChildBorderCrack(TessBumpBlock& tblock)
+void Terrain::ChildBorderCrack(TerrainBlock& tblock)
 {
 	int id = tblock.blockID - m_Block.size() - 1;
 	int remain = id % 4;
@@ -493,7 +519,7 @@ void TessBumpTerrain::ChildBorderCrack(TessBumpBlock& tblock)
 	}
 }
 
-void TessBumpTerrain::BorderCrack(TessBumpBlock& tblock)
+void Terrain::BorderCrack(TerrainBlock& tblock)
 {
 	int id = tblock.blockID - 1;
 	if (id >= LEVEL * 12)
@@ -647,16 +673,15 @@ void TessBumpTerrain::BorderCrack(TessBumpBlock& tblock)
 	}
 }
 
-
-void TessBumpTerrain::ViewFrustum()
+void Terrain::ViewFrustum()
 {
 	glm::vec3 deltaPos = currentPos - lastPos;
 	glm::vec3 deltaDir = currentDir - lastDir;
 
-	if (sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z) > 50) transferdata = true;
+	if (sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z) > 0) transferdata = true;
 	else
 	{
-		if (sqrt(deltaDir.x * deltaDir.x + deltaDir.y * deltaDir.y + deltaDir.z * deltaDir.z) > 0.5) transferdata = true;
+		if (sqrt(deltaDir.x * deltaDir.x + deltaDir.y * deltaDir.y + deltaDir.z * deltaDir.z) > 0) transferdata = true;
 		else transferdata = false;
 	}
 
@@ -667,7 +692,26 @@ void TessBumpTerrain::ViewFrustum()
 	}
 }
 
-void TessBumpTerrain::VTPassGenerateVertices()
+void Terrain::NeedTransferData()
+{
+	glm::vec3 deltaPos = currentPos - needlastPos;
+	glm::vec3 deltaDir = currentDir - needlastDir;
+
+	if (sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z) > 200) needtranfersdata = true;
+	else
+	{
+		if (sqrt(deltaDir.x * deltaDir.x + deltaDir.y * deltaDir.y + deltaDir.z * deltaDir.z) > 0.2) needtranfersdata = true;
+		else needtranfersdata = false;
+	}
+
+	if (needtranfersdata)
+	{
+		needlastPos = currentPos;
+		needlastDir = currentDir;
+	}
+}
+
+void Terrain::VTPassGenerateVertices()
 {
 	m_vtvertices.clear();
 	for (int i = 0; i < m_Block.size(); i++)
@@ -707,7 +751,7 @@ void TessBumpTerrain::VTPassGenerateVertices()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void TessBumpTerrain::RenderPassGenerateVertices()
+void Terrain::RenderPassGenerateVertices()
 {
 	updateBlock();
 	m_vertices.clear();
@@ -732,11 +776,16 @@ void TessBumpTerrain::RenderPassGenerateVertices()
 			{
 				for (int j = 0; j < 3; j++)
 				{
-					m_bumpvertices.push_back(m_Block[i].vertices[j]);
+					glm::vec3 vertices = m_Block[i].vertices[j];
+					m_bumpvertices.push_back(vertices);
 				}
-				m_bumpvertices.push_back(m_Block[i].vertices[0]);
-				m_bumpvertices.push_back(m_Block[i].vertices[2]);
-				m_bumpvertices.push_back(m_Block[i].vertices[3]);
+
+				glm::vec3 tvertices = m_Block[i].vertices[0];
+				m_bumpvertices.push_back(tvertices);
+				tvertices = m_Block[i].vertices[2];
+				m_bumpvertices.push_back(tvertices);
+				tvertices = m_Block[i].vertices[3];
+				m_bumpvertices.push_back(tvertices);
 
 				BorderCrack(m_Block[i]);
 
@@ -771,11 +820,16 @@ void TessBumpTerrain::RenderPassGenerateVertices()
 			{
 				for (int j = 0; j < 3; j++)
 				{
-					m_bumpvertices.push_back(m_Child[i].vertices[j]);
+					glm::vec3 vertices = m_Child[i].vertices[j];
+					m_bumpvertices.push_back(vertices);
 				}
-				m_bumpvertices.push_back(m_Child[i].vertices[0]);
-				m_bumpvertices.push_back(m_Child[i].vertices[2]);
-				m_bumpvertices.push_back(m_Child[i].vertices[3]);
+				glm::vec3 tvertices = m_Child[i].vertices[0];
+				m_bumpvertices.push_back(tvertices);
+				tvertices = m_Child[i].vertices[2];
+				m_bumpvertices.push_back(tvertices);
+				tvertices = m_Child[i].vertices[3];
+				m_bumpvertices.push_back(tvertices);
+
 
 				ChildBorderCrack(m_Child[i]);
 
@@ -832,17 +886,66 @@ void TessBumpTerrain::RenderPassGenerateVertices()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void TessBumpTerrain::Render()
+void Terrain::Render()
 {
-	ViewFrustum();
+	glEnable(GL_MULTISAMPLE);
+
+	glClearDepth(1.0f);
+	glClearColor(0.46f, 0.46f, 1.0f, 1.0f);
+	// Clear the screen
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glEnable(GL_DEPTH_TEST);
+
+	//vt render
+	feedback.clear();
+	feedback.begin();
+	glViewport(0, 0, FEEDBACK_WIDTH, FEEDBACK_HEIGHT);
+
+	m_vtshader.Enable();
+
+	updateHtex(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.y, currentPos.z / CHUNKNUMBER / CHUNKSIZE);
+	m_vtshader.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
+	m_vtshader.SetWVP(m_WVP);
+	m_vtshader.SetBlockSize(m_Block.size() + m_Child.size());
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, htex.getTex());
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, htex.getTex());
+
+	PTex* ptex = htex.getPtex();
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ptex->getTex());
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, hLevelTex);
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, hLevelTex1);
+
+	VTPassGenerateVertices();
+
+	glBindVertexArray(vao[0]);
+
+	glDrawArrays(GL_PATCHES, 0, m_vtvertices.size());
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+	feedback.end();
+
+	updateBtex();
 
 	glClearDepth(1.0f);
 	glClearColor(0.46f, 0.46f, 1.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
-
-	if (transferdata)
-		RenderPassGenerateVertices();
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 
 	if (m_linemode)
 	{
@@ -866,25 +969,51 @@ void TessBumpTerrain::Render()
 
 	m_specular.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
 	m_specular.SetWVP(m_WVP);
-	m_specular.SetWorldMatrix(m_World);
-	m_specular.SetDirectionalLight(m_directionalLight);
+	//m_specular.SetWorldMatrix(m_World);
 	m_specular.SetEyeWorldPos(m_camerapos);
-	m_specular.SetMatSpecularIntensity(1.0f);
-	m_specular.SetMatSpecularPower(1.0f);
-	m_specular.SetShowAO(AOflag);
 	m_specular.SetShowTexture(m_Textureflag);
+	m_specular.SetSGLights(1.0, &m_SGlight);
 
 	glEnable(GL_TEXTURE_2D);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, htex.getTex());
 
-	vector<PTex*> ptexes;
-	if (!transferdata)ptexes = htex.getPtexes();
+	ptex = htex.getPtex();
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
+	glBindTexture(GL_TEXTURE_2D, ptex->getTex());
+
+	//ptex = htex.getSatPtex();
+	//glActiveTexture(GL_TEXTURE8);
+	//glBindTexture(GL_TEXTURE_2D, ptex->getTex());
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, hLevelTex);
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, hLevelTex1);
+
+	PTex* bptex = btex.getPtex();
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, btex.getTex());
 
 	glActiveTexture(GL_TEXTURE5);
-	glBindTexture(GL_TEXTURE_2D, Maxmintexture);
+	glBindTexture(GL_TEXTURE_2D, bptex->getTex());
+
+	PTex* nptex = ntex.getPtex();
+	glActiveTexture(GL_TEXTURE6);
+	glBindTexture(GL_TEXTURE_2D, ntex.getTex());
+
+	glActiveTexture(GL_TEXTURE7);
+	glBindTexture(GL_TEXTURE_2D, nptex->getTex());
+
+	PTex* visptex = vistex.getPtex();
+	glActiveTexture(GL_TEXTURE8);
+	glBindTexture(GL_TEXTURE_2D, vistex.getTex());
+
+	glActiveTexture(GL_TEXTURE9);
+	glBindTexture(GL_TEXTURE_2D, visptex->getTex());
+
+	RenderPassGenerateVertices();
 
 	glBindVertexArray(vao[1]);
 
@@ -893,58 +1022,4 @@ void TessBumpTerrain::Render()
 	glBindVertexArray(0);
 	glUseProgram(0);
 
-	m_bump.Enable();
-	m_bump.SetWVP(m_WVP);
-
-	m_bump.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
-
-	m_bump.SetWorldMatrix(m_World);
-	m_bump.SetDirectionalLight(m_directionalLight);
-	m_bump.SetEyeWorldPos(m_camerapos);
-	m_bump.SetMatSpecularIntensity(1.0f);
-	m_bump.SetMatSpecularPower(1.0f);
-	m_bump.SetShowAO(AOflag);
-	m_bump.SetShowTexture(m_Textureflag);
-
-	glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, htex.getTex());
-
-	if (!transferdata)ptexes = htex.getPtexes();
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
-
-	glBindVertexArray(vao[2]);
-
-	glDrawArrays(GL_TRIANGLES, 0, m_bumpvertices.size());
-
-	glBindVertexArray(0);
-	glUseProgram(0);
-
-	m_border.Enable();
-	m_border.SetWVP(m_WVP);
-
-	m_border.SetCurrentPosition(glm::vec4(currentPos.x / CHUNKNUMBER / CHUNKSIZE, currentPos.z / CHUNKNUMBER / CHUNKSIZE, currentPos.y, 0.0));
-
-	m_border.SetWorldMatrix(m_World);
-	m_border.SetDirectionalLight(m_directionalLight);
-	m_border.SetEyeWorldPos(m_camerapos);
-	m_border.SetMatSpecularIntensity(1.0f);
-	m_border.SetMatSpecularPower(1.0f);
-	m_border.SetShowAO(AOflag);
-	m_border.SetShowTexture(m_Textureflag);
-
-	glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, htex.getTex());
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, ptexes[0]->getTex());
-
-	glBindVertexArray(vao[3]);
-
-	glDrawArrays(GL_PATCHES, 0, m_bordervertices.size());
-
-	glBindVertexArray(0);
-	glUseProgram(0);
 }

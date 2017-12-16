@@ -57,9 +57,9 @@ void Camera::move(bool keys[], float deltaTime, int width, int height) {
 	if (keys[GLFW_KEY_D])
 		pos += speed * horizontal;
 	if (keys[GLFW_KEY_SPACE])
-		pos.y += speed.x;
+		pos.y += speed.x * 10;
 	if (keys[GLFW_KEY_C])
-		pos.y -= speed.x;
+		pos.y -= speed.x * 10;
 	speed /= deltaTime;
 	if (pos.x > width || pos.x < 0 || pos.z > height || pos.z < 0)
 		pos = nPos;

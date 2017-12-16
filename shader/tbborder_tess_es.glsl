@@ -8,7 +8,6 @@ out vec3 EyeDirection_worldspace;
 out vec3 Position_worldspace;
 
 uniform vec4 currentPos;
-uniform vec4 currentPos;
 uniform sampler2D vtex;
 uniform sampler2D texHeightmap;
 uniform sampler2D texHLevel;
@@ -18,9 +17,10 @@ uniform mat4 gWorld;
 uniform vec3 gEyeWorldPos;
 
 const float VIEWCHUNKNUMBER = 16.0;
-const float MAXSCALE = 200.0 * VIEWCHUNKNUMBER / 4.0;
 const float CHUNKNUMBER = 32.0;
 const float CHUNKSIZE = 512.0;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
+
 
 void main()
 {

@@ -23,8 +23,9 @@ private:
 	vector<int> w, h;
 	vector<int> length;
 	GLuint tex;
-//  PTex* ptexes;
-	vector<PTex*> ptexes;
+    PTex* ptex;
+//	vector<PTex*> ptexes;
+	PTex* satptex;
 	SatManager* satManager;
 	int pageSize, virtualWidth;
 	int maxLevel;
@@ -46,8 +47,9 @@ public:
 	GLuint generateTex();
 	GLuint getTex();
 	void clear();
-//	PTex * getPtex();
-	vector<PTex*> getPtex();
+	PTex * getPtex();
+	PTex * getSatPtex();
+//	vector<PTex*> getPtex();
 	SatManager* getSatTex();
 	//vector<PTex*> getPtexes();
 	int getMaxLevel() const;

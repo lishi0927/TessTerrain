@@ -20,6 +20,9 @@
 #define BLENDSIZE (512)
 #define LEVELOFBLENDTEX (7)
 
+#define AOERROR 0.8
+#define SHADING_ERROR 0.2
+
 #define XMIN (15)
 #define YMIN (-24)
 
@@ -40,7 +43,7 @@
 #define LEFTTOP (8)
 
 #define BORDERSIZE (4)
-#define HBORDERSIZE (4)
+#define HBORDERSIZE (3)
 
 #define M_PI       3.14159265358979323846   // pi
 
@@ -51,17 +54,20 @@ typedef unsigned char  uchar;
 
 #define TERRAINFILE "dem"
 
-const int GRID = CHUNKSIZE;
+const int GRID = 128;
 //const int GRID = CHUNKSIZE;
-const float MAXSCALE = 200.0f * VIEWCHUNKNUMBER / 4.0f;
+const float MAXSCALE =  10 * CHUNKSIZE * VIEWCHUNKNUMBER / 4.0f;
 const int WIDTH = 1024, HEIGHT = 720;
 const int FEEDBACK_WIDTH = WIDTH / 10;
 const int FEEDBACK_HEIGHT = HEIGHT / 10;
 const float fov = 45.0f;
 const float znear = 0.1f;
-const float zfar = 2000.0f;
+//const float zfar = 2000.0f;
+const float zfar = 163840.0f;
 
 using namespace std;
+
+
 
 string getChunkName(int x, int y);
 
@@ -72,4 +78,6 @@ float clampf(float x, float a, float b);
 void openfile(const char* filename, FILE* &fp);
 
 void seekfile(FILE* fp, int off, int pos);
+
+uint64_t getRepresentation(const double number);
 #endif

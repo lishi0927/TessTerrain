@@ -5,10 +5,9 @@ VTex::VTex() {
 }
 
 VTex::~VTex() {
-	//for (auto ptex : ptexes)
-		//delete ptex;
-	for(int i = 0; i<ptexes.size();i++)
-	   delete ptexes[i];
+	delete ptex;
+	if (satptex)delete satptex;
+	
 }
 
 void VTex::init(int pageSize, int virtualWidth, string dataname, int maxLevel) {
@@ -28,29 +27,23 @@ void VTex::init(int pageSize, int virtualWidth, string dataname, int maxLevel) {
 		w.push_back(tmp);
 		h.push_back(tmp);
 		ptable.push_back(new float[w[i] * h[i] * 4]);
-		memset(ptable.back(), 0, w[i] * h[i] * 4);
-		//latest.push_back(new bool[w[i] * h[i]]);
-	}
+		memset(ptable.back(), 0, w[i] * h[i] * 4);	
+	}	
 	
 	this->dataname = dataname;
 	this->maxLevel = maxLevel;
 
-	ptexes.clear();
-	PTex *ptex;
 	if (dataname[0] == 'd') {
-		ptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.75, dataname);
+		ptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.5, dataname);
 		ptex->init(maxLevel, virtualWidth);
-		ptexes.push_back(ptex);
-		ptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.75, "maxDiffSAT");
-		ptex->init(maxLevel, virtualWidth);
-		ptexes.push_back(ptex);
+//		satptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.75, "maxDiffSAT");
+//		satptex->init(maxLevel, virtualWidth);
 //		satManager = new SatManager(VIEWCHUNKNUMBER * VIEWCHUNKNUMBER / 4);
 //		satManager->init(maxLevel, virtualWidth);
 	}
 	else {
-		ptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.75, dataname);
+		ptex = new PTex(pageSize, VIEWCHUNKNUMBER * 0.5, dataname);
 		ptex->init(maxLevel, virtualWidth);
-		ptexes.push_back(ptex);
 	}
 
 	glGenTextures(1, &tex);
@@ -117,9 +110,9 @@ void updateList(int k, int x, int y, int wk, set<pair<int, int> >&loadingSet, ve
 }
 
 void VTex::update(int k, int x, int y, bool needUpdateSat) {
-	updateList(k, x, y, w[k], loadingPtex, ptexHandles, ptexes[0], this);
-	if (dataname[0] == 'd' && needUpdateSat)
-		updateList(k, x, y, w[k], loadingSat, satHandles, ptexes[1], this);
+	updateList(k, x, y, w[k], loadingPtex, ptexHandles, ptex, this);
+//	if (dataname[0] == 'd' && needUpdateSat)
+//		updateList(k, x, y, w[k], loadingSat, satHandles, satptex, this);
 }
 
 void VTex::update(float currentX, float currentY, float currentH, float hLevel[], unsigned char hLevel1[],
@@ -294,23 +287,23 @@ GLuint VTex::getTex() {
 
 void VTex::clear() {
 //	ptex->clearCount();
-	ptexes[0]->clearCount();
+	ptex->clearCount();
 //	if (dataname[0] == 'd') {
 //		satManager->clearCount();
 //	}
-	if (dataname[0] == 'd') {
-		 ptexes[1]->clearCount();
-			}
+	//if (dataname[0] == 'd') {
+	//	 satptex->clearCount();
+	//		}
 	//for (int i = 0; i < maxLevel; i++)
 		//memset(latest[i], 0, w[i] * h[i]);
 }
-/*
+
 PTex* VTex::getPtex() {
 	return ptex;
-}*/
+}
 
-vector<PTex*> VTex::getPtex() {
-	return ptexes;
+PTex* VTex::getSatPtex() {
+	return satptex;
 }
 
 SatManager* VTex::getSatTex()
@@ -332,45 +325,135 @@ void VTex::map(BasePage* tp) {
 	tx = x;
 	ty = y;
 	//printf("map %d %d %d:\n", level, x, y);
-	int tot = 0;
-	for (int i = level; i >= 0; i--) {
-		int lx, rx, ly, ry;
-		int n = CHUNKNUMBER >> i;
-		n = (n == 0) ? 1 : n;
-		lx = tx;
-		ly = ty;
-		rx = lx + (1 << level - i);
-		clamp(rx, 0, n);
-		ry = ly + (1 << level - i);
-		clamp(ry, 0, n);
-		//printf("level %d range: %d %d %d %d\n\n", i, lx, rx, ly, ry);
-		for (int k1 = lx; k1 < rx; k1++)
-			for (int k2 = ly; k2 < ry; k2++) {
-				pt = ptable[i] + (k2 * w[i] + k1) * 4;
-				if (pt[0] >= (float)length[level] / ptexes[0]->getPixelSize())
-					continue;
-				tot++;
-				if (i == 0 && k1 == 2 && k2 == 4)
-					k1 = k1;
-				pt = ptable[i] + (k2 * w[i] + k1) * 4;
-				pt[0] = (float)length[level] / ptexes[0]->getPixelSize();
-				pt[1] = 0;
-				pt[2] = (float)tp->getPx() / ptexes[0]->getPhysicalWidth() -
-						(float)lx / w[i] * pt[0];
-				pt[2] += ((float)ptexes[0]->getBorderSize())
-						/ ptexes[0]->getPixelSize();
-				pt[3] = (float)tp->getPy() / ptexes[0]->getPhysicalWidth() -
-						(float)ly / h[i] * pt[0];
-				pt[3] += ((float)ptexes[0]->getBorderSize())
-						/ ptexes[0]->getPixelSize();
+	if (dataname[0] == 'V')
+	{
+		if (level != 0)
+		{
+			int tot = 0;
+			for (int i = level; i >= 1; i--) {
+				int lx, rx, ly, ry;
+				int n = CHUNKNUMBER >> i;
+				n = (n == 0) ? 1 : n;
+				lx = tx;
+				ly = ty;
+				rx = lx + (1 << level - i);
+				clamp(rx, 0, n);
+				ry = ly + (1 << level - i);
+				clamp(ry, 0, n);
+				//printf("level %d range: %d %d %d %d\n\n", i, lx, rx, ly, ry);
+				for (int k1 = lx; k1 < rx; k1++)
+					for (int k2 = ly; k2 < ry; k2++) {
+						pt = ptable[i] + (k2 * w[i] + k1) * 4;
+						if (pt[1] >= 1.0 - 1.0 * level / maxLevel)
+							continue;
+						tot++;
+						pt[0] = (float)length[level] * 2 / ptex->getPixelSize();
+						pt[1] = 1.0 - 1.0 * level / maxLevel;
+						pt[2] = (float)tp->getPx() / ptex->getPhysicalWidth() -
+							(float)lx / w[i] * pt[0];
+						pt[2] += ((float)ptex->getBorderSize())
+							/ ptex->getPixelSize();
+						pt[3] = (float)tp->getPy() / ptex->getPhysicalWidth() -
+							(float)ly / h[i] * pt[0];
+						pt[3] += ((float)ptex->getBorderSize())
+							/ ptex->getPixelSize();
+					}
+				ty <<= 1;
+				tx <<= 1;
+				if (!tot)
+					break;
+				else
+					tot = 0;
 			}
-		ty <<= 1;
-		tx <<= 1;
-		if (!tot)
-			break;
+			{
+				int lx, rx, ly, ry;
+				lx = tx;
+				ly = ty;
+				rx = lx + (1 << (level - 1));
+				clamp(rx, 0, CHUNKNUMBER);
+				ry = ly + (1 << (level-1));
+				clamp(ry, 0, CHUNKNUMBER);
+				for (int k1 = lx; k1 < rx; k1++)
+					for (int k2 = ly; k2 < ry; k2++) {
+						pt = ptable[0] + (k2 * w[0] + k1) * 4;
+						if (pt[1] >= 1.0 - 1.0 * level / maxLevel)
+							continue;
+						tot++;
+						pt[0] = (float)length[level] * 2 / ptex->getPixelSize();
+						pt[1] = 1.0 - 1.0 * level / maxLevel;
+						pt[2] = (float)tp->getPx() / ptex->getPhysicalWidth() -
+							(float)lx / w[0] * pt[0];
+						pt[2] += ((float)ptex->getBorderSize())
+							/ ptex->getPixelSize();
+						pt[3] = (float)tp->getPy() / ptex->getPhysicalWidth() -
+							(float)ly / h[0] * pt[0];
+						pt[3] += ((float)ptex->getBorderSize())
+							/ ptex->getPixelSize();
+					}
+			}
+			
+
+		}
+		//level 0
 		else
-			tot = 0;
+		{
+			pt = ptable[0] + (ty * w[0] + tx) * 4;
+			pt[0] = (float)length[0] / ptex->getPixelSize();
+			pt[1] = 1.0;
+			pt[2] = (float)tp->getPx() / ptex->getPhysicalWidth() -
+				(float)tx / w[0] * pt[0];
+			pt[2] += ((float)ptex->getBorderSize())
+				/ ptex->getPixelSize();
+			pt[3] = (float)tp->getPy() / ptex->getPhysicalWidth() -
+				(float)ty / h[0] * pt[0];
+			pt[3] += ((float)ptex->getBorderSize())
+				/ ptex->getPixelSize();
+		}
+		
 	}
+	else
+	{
+		int tot = 0;
+		for (int i = level; i >= 0; i--) {
+			int lx, rx, ly, ry;
+			int n = CHUNKNUMBER >> i;
+			n = (n == 0) ? 1 : n;
+			lx = tx;
+			ly = ty;
+			rx = lx + (1 << level - i);
+			clamp(rx, 0, n);
+			ry = ly + (1 << level - i);
+			clamp(ry, 0, n);
+			//printf("level %d range: %d %d %d %d\n\n", i, lx, rx, ly, ry);
+			for (int k1 = lx; k1 < rx; k1++)
+				for (int k2 = ly; k2 < ry; k2++) {
+					pt = ptable[i] + (k2 * w[i] + k1) * 4;
+					if (pt[0] >= (float)length[level] / ptex->getPixelSize())
+						continue;
+					tot++;
+				//	if (i == 0 && k1 == 2 && k2 == 4)
+				//		k1 = k1;
+				//	pt = ptable[i] + (k2 * w[i] + k1) * 4;
+					pt[0] = (float)length[level] / ptex->getPixelSize();
+					pt[1] = 0;
+					pt[2] = (float)tp->getPx() / ptex->getPhysicalWidth() -
+						(float)lx / w[i] * pt[0];
+					pt[2] += ((float)ptex->getBorderSize())
+						/ ptex->getPixelSize();
+					pt[3] = (float)tp->getPy() / ptex->getPhysicalWidth() -
+						(float)ly / h[i] * pt[0];
+					pt[3] += ((float)ptex->getBorderSize())
+						/ ptex->getPixelSize();
+				}
+			ty <<= 1;
+			tx <<= 1;
+			if (!tot)
+				break;
+			else
+				tot = 0;
+		}
+	}
+	
 }
 
 void VTex::unmap(BasePage* tp) {
@@ -386,6 +469,60 @@ void VTex::unmap(BasePage* tp) {
 	int tx, ty;
 	tx = x;
 	ty = y;
+	if (dataname[0] == 'V')
+	{
+		if (level != 0)
+		{
+			int tot = 0;
+			for (int i = level; i >= 1; i--) {
+				int lx, rx, ly, ry;
+				int n = CHUNKNUMBER >> (i);
+				n = (n == 0) ? 1 : n;
+				lx = tx;
+				ly = ty;
+				rx = lx + (1 << level - i);
+				clamp(rx, 0, n);
+				ry = ly + (1 << level - i);
+				clamp(ry, 0, n);
+				for (int k1 = lx; k1 < rx; k1++)
+					for (int k2 = ly; k2 < ry; k2++) {
+						pt = ptable[i] + (k2 * w[i] + k1) * 4;
+						if (pt[1] >= 1.0 - 1.0 * level / maxLevel)
+							continue;
+						tot++;
+						pt[1] = 0.0;
+					}
+				tx <<= 1;
+				ty <<= 1;
+				if (!tot)
+					break;
+				else
+					tot = 0;
+			}
+			{
+				pt = ptable[0] + (ty * w[0] + tx) * 4;
+				pt[1] = 0.0;
+			}
+		}
+		else
+		{
+			pt = ptable[0] + (ty * w[0] + tx) * 4;
+			pt[1] = 1.0;
+		}
+		for (int i = level + 1; i < maxLevel; i++) {
+			if (i != 1)
+			{
+				x >>= 1;
+				y >>= 1;
+			}		
+			if ((tp = ptex->findPage(i, x, y)) != nullptr) {
+				map(tp);
+				break;
+			}
+		}
+	}
+	else
+	{
 	int tot = 0;
 	for (int i = level; i >= 0; i--) {
 		int lx, rx, ly, ry;
@@ -400,7 +537,7 @@ void VTex::unmap(BasePage* tp) {
 		for (int k1 = lx; k1 < rx; k1++)
 			for (int k2 = ly; k2 < ry; k2++) {	
 				pt = ptable[i] + (k2 * w[i] + k1) * 4;
-				if (pt[0] >= (float)length[level] / ptexes[0]->getPixelSize())
+				if (pt[0] >= (float)length[level] / ptex->getPixelSize())
 					continue;
 				tot++;
 				pt = ptable[i] + (k2 * w[i] + k1) * 4;
@@ -416,10 +553,11 @@ void VTex::unmap(BasePage* tp) {
 	for (int i = level + 1; i < maxLevel; i++) {
 		x >>= 1;
 		y >>= 1;
-		if ((tp = ptexes[0]->findPage(i, x, y)) != nullptr) {
+		if ((tp = ptex->findPage(i, x, y)) != nullptr) {
 			map(tp);
 			break;
 		}
+	}
 	}
 }
 
@@ -429,19 +567,19 @@ void VTex::loadCoarsest() {
 	n = (n == 0) ? 1 : n;
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) {
-			BasePage *tp = ptexes[0]->getReplacePage();
+			BasePage *tp = ptex->getReplacePage();
 			tp->setVirtualPos(level, i, j);
 			tp->loadData(level, i, j);
-			ptexes[0]->update(level, i, j, tp);
-			ptexes[0]->insert(level, i, j, tp);
+			ptex->update(level, i, j, tp);
+			ptex->insert(level, i, j, tp);
 			map(tp);
-			if (dataname[0] == 'd') {
-				tp = ptexes[1]->getReplacePage();
-				tp->setVirtualPos(level, i, j);
-				tp->loadData(level, i, j);
-				ptexes[1]->update(level, i, j, tp);
-				ptexes[1]->insert(level, i, j, tp);
-			}
+		//	if (dataname[0] == 'd') {
+		//		tp = satptex->getReplacePage();
+		//		tp->setVirtualPos(level, i, j);
+		//		tp->loadData(level, i, j);
+		//		satptex->update(level, i, j, tp);
+		//		satptex->insert(level, i, j, tp);
+		//	}
 		}
 }
 
@@ -470,9 +608,9 @@ void checkState(vector<int>&w, set<pair<int, int> > &loadingSet, vector<ThreadIn
 }
 
 void VTex::checkThreadState() {
-	checkState(w, loadingPtex, ptexHandles, ptexes[0], this);
-	if (dataname[0] == 'd')
-		checkState(w, loadingSat, satHandles, ptexes[1], nullptr);
+	checkState(w, loadingPtex, ptexHandles, ptex, this);
+	//if (dataname[0] == 'd')
+	//	checkState(w, loadingSat, satHandles, satptex, nullptr);
 }
 
 unsigned int VTex::updatePage(void* pm) {

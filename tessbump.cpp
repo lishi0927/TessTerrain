@@ -18,15 +18,25 @@ bool TessBumpShader_Bump::Init()
 	m_currentPosLocation = glGetUniformLocation(shader, "currentPos");
 	m_vtexLocation = glGetUniformLocation(shader, "vtex");
 	m_heightmapLocation = glGetUniformLocation(shader, "texHeightmap");
-	m_texLocation = glGetUniformLocation(shader, "colormap");
+	m_texLocation = glGetUniformLocation(shader, "blendtex");
 
-	m_AOLocation = glGetUniformLocation(shader, "AOmap");
+	m_AOtexLocation = glGetUniformLocation(shader, "aotex");
+	m_AOleveltexLocation = glGetUniformLocation(shader, "texaolevel");
+	m_AOmaptexLocation = glGetUniformLocation(shader, "texAOmap");
+//	m_AOmaxLocation = glGetUniformLocation(shader, "texaomax");
 
-	m_ShowAOLocation = glGetUniformLocation(shader, "gShowAO");
+
+//	m_ShowAOLocation = glGetUniformLocation(shader, "gShowAO");
 	m_ShowTextureLocation = glGetUniformLocation(shader, "gShowTexture");
 
-	m_hlevelLocation = glGetUniformLocation(shader, "HLevel");
-	m_hlevel1Location = glGetUniformLocation(shader, "HLevel1");
+	m_hlevelLocation = glGetUniformLocation(shader, "texHLevel");
+	m_hlevel1Location = glGetUniformLocation(shader, "texHLevel1");
+
+	m_btexLocation = glGetUniformLocation(shader, "btex");
+	m_ntexLocation = glGetUniformLocation(shader, "ntex");
+	m_normalmapLocation = glGetUniformLocation(shader, "normaltex");
+//	m_normallevelLocation = glGetUniformLocation(shader, "normallevel");
+
 
 	if (m_dirLightLocation.AmbientIntensity == 0xFFFFFFFF ||
 		m_WVPLocation == 0xFFFFFFFF ||
@@ -40,7 +50,7 @@ bool TessBumpShader_Bump::Init()
 		m_currentPosLocation == 0xFFFFFFFF ||
 		m_vtexLocation == 0xFFFFFFFF ||
 		m_heightmapLocation == 0xFFFFFFFF ||
-		m_AOLocation == 0xFFFFFFFF ||
+//		m_AOLocation == 0xFFFFFFFF ||
 		m_hlevelLocation == 0xFFFFFFFF ||
 		m_hlevel1Location == 0xFFFFFFFF) {
 		return false;
@@ -104,9 +114,24 @@ void TessBumpShader_Bump::SetColortex(unsigned int TextureUnit)
 	glUniform1i(m_texLocation, TextureUnit);
 }
 
-void TessBumpShader_Bump::SetAOTex(unsigned int TextureUnit)
+void TessBumpShader_Bump::SetAOtex(unsigned int TextureUnit)
 {
-	glUniform1i(m_AOLocation, TextureUnit);
+	glUniform1i(m_AOtexLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetAOlevelTex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOleveltexLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetAOmaxTex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOmaxLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetAOMaptex(unsigned int TextureUnit)
+{
+	glUniform1i(m_AOmaptexLocation, TextureUnit);
 }
 
 void TessBumpShader_Bump::SetShowAO(int flag)
@@ -127,4 +152,24 @@ void TessBumpShader_Bump::SetHLevel(unsigned int TextureUnit)
 void TessBumpShader_Bump::SetHLevel1(unsigned int TextureUnit)
 {
 	glUniform1i(m_hlevel1Location, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetNtex(unsigned int TextureUnit)
+{
+	glUniform1i(m_ntexLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetBtex(unsigned int TextureUnit)
+{
+	glUniform1i(m_btexLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetNormaltex(unsigned int TextureUnit)
+{
+	glUniform1i(m_normalmapLocation, TextureUnit);
+}
+
+void TessBumpShader_Bump::SetNormallevel(unsigned int TextureUnit)
+{
+	glUniform1i(m_normallevelLocation, TextureUnit);
 }
